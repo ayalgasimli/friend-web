@@ -170,20 +170,22 @@ const GraphView = ({ nodes, links, onRefresh }) => {
       <div style={{ flex: 1, position: 'relative' }}>
         <ForceGraph2D
           ref={graphRef}
-          width={window.innerWidth - 250 - (selected ? 350 : 0)}
+          width={window.innerWidth - (window.innerWidth >= 768 && selected ? 350 : 0)}
           height={window.innerHeight}
           graphData={{
             nodes: nodes.map((node, i) => {
               // "Round Table" Layout
               const count = nodes.length;
-              const radius = Math.max(300, count * 30); // Dynamic radius based on population
+              // Dynamic radius based on screen size (min dimension), but keep some padding
+              const minDim = Math.min(window.innerWidth, window.innerHeight);
+              const layoutRadius = Math.max(150, minDim * 0.35); // at least 150px, or 35% of screen
               const angle = (i / count) * 2 * Math.PI;
 
               return {
                 ...node,
                 // Fix position to circle
-                fx: radius * Math.cos(angle),
-                fy: radius * Math.sin(angle)
+                fx: layoutRadius * Math.cos(angle),
+                fy: layoutRadius * Math.sin(angle)
               };
             }),
             links: links.map(link => ({ ...link }))   // Shallow copy to prevent mutation of state
