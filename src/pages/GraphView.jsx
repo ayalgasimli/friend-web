@@ -40,8 +40,10 @@ const GraphView = ({ nodes, links, onRefresh }) => {
   // Configure Physics
   useEffect(() => {
     if (graphRef.current) {
-      graphRef.current.d3Force('charge').strength(-800);
-      graphRef.current.d3Force('link').distance(100);
+      // Physics disabled for fixed Circular Layout
+      graphRef.current.d3Force('charge', null);
+      graphRef.current.d3Force('link', null);
+      graphRef.current.d3Force('center', null);
 
       // Zoom to fit on initial load (after a delay for sim to settle)
       setTimeout(() => {
@@ -138,9 +140,17 @@ const GraphView = ({ nodes, links, onRefresh }) => {
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 20, height: 4, background: '#3B82F6', borderRadius: 2 }} />
-              <span style={{ color: '#aaa', fontSize: 12 }}>Friend</span>
+              <span style={{ color: '#aaa', fontSize: 12 }}>Friend (1st)</span>
             </div>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 20, height: 4, background: 'linear-gradient(90deg, #9333EA 70%, transparent 30%)', backgroundSize: '8px 4px', borderRadius: 2 }} />
+              <span style={{ color: '#aaa', fontSize: 12 }}>2nd Degree</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
+              <div style={{ width: 20, height: 4, background: 'linear-gradient(90deg, #EAB308 70%, transparent 30%)', backgroundSize: '4px 4px', borderRadius: 2 }} />
+              <span style={{ color: '#aaa', fontSize: 12 }}>3rd Degree</span>
+            </div>
+            <div style={{ display: 'flex', alignItems: 'center', gap: 10, marginTop: 8, paddingTop: 8, borderTop: '1px solid rgba(255,255,255,0.1)' }}>
               <div style={{ width: 20, height: 4, background: '#EF4444', borderRadius: 2 }} />
               <span style={{ color: '#aaa', fontSize: 12 }}>Lover</span>
             </div>
@@ -162,19 +172,46 @@ const GraphView = ({ nodes, links, onRefresh }) => {
           ref={graphRef}
           width={window.innerWidth - 250 - (selected ? 350 : 0)}
           height={window.innerHeight}
-          graphData={{ nodes, links }}
+          graphData={{
+            nodes: nodes.map((node, i) => {
+              // "Round Table" Layout
+              const count = nodes.length;
+              const radius = Math.max(300, count * 30); // Dynamic radius based on population
+              const angle = (i / count) * 2 * Math.PI;
+
+              return {
+                ...node,
+                // Fix position to circle
+                fx: radius * Math.cos(angle),
+                fy: radius * Math.sin(angle)
+              };
+            }),
+            links: links.map(link => ({ ...link }))   // Shallow copy to prevent mutation of state
+          }}
           nodeLabel="name"
           nodeAutoColorBy="id"
-          nodeRelSize={8}
+          nodeRelSize={10}
           nodeCanvasObject={(node, ctx, globalScale) => {
             const size = 12;
             const isSelected = selected?.id === node.id;
 
+            // Draw Glow / Selection Effect
+            if (isSelected) {
+              ctx.shadowColor = '#60A5FA';
+              ctx.shadowBlur = 20;
+            } else {
+              ctx.shadowColor = 'transparent';
+              ctx.shadowBlur = 0;
+            }
+
             // Draw circle background
             ctx.beginPath();
             ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-            ctx.fillStyle = isSelected ? '#3B82F6' : '#1e293b';
+            ctx.fillStyle = isSelected ? '#1e293b' : '#0f172a';
             ctx.fill();
+
+            // Reset shadow for image to stay crisp
+            ctx.shadowBlur = 0;
 
             // Draw Image
             const imgSrc = node.img || `https://api.dicebear.com/7.x/initials/svg?seed=${node.name}`;
@@ -188,32 +225,60 @@ const GraphView = ({ nodes, links, onRefresh }) => {
               ctx.restore();
             }
 
-            // Draw border if selected
-            if (isSelected) {
-              ctx.beginPath();
-              ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-              ctx.lineWidth = 2 / globalScale;
-              ctx.strokeStyle = '#60A5FA';
-              ctx.stroke();
-            }
+            // Draw Ring
+            ctx.beginPath();
+            ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
+            ctx.lineWidth = isSelected ? 3 / globalScale : 1.5 / globalScale;
+            ctx.strokeStyle = isSelected ? '#60A5FA' : 'rgba(255,255,255,0.2)';
+            ctx.stroke();
 
-            // Draw Label below
+            // Draw Label only if zoomed in or hovered/selected
+            // Simplistic LOD: always show for now, but style it better
             const label = node.name;
-            const fontSize = 12 / globalScale;
-            ctx.font = `${fontSize}px Sans-Serif`;
-            const textWidth = ctx.measureText(label).width;
-            const bckgDimensions = [textWidth, fontSize].map(n => n + fontSize * 0.2); // some padding
-
-            ctx.fillStyle = 'rgba(0, 0, 0, 0.6)';
-            ctx.fillRect(node.x - bckgDimensions[0] / 2, node.y + size + 2, bckgDimensions[0], bckgDimensions[1]);
+            const fontSize = 14 / globalScale;
+            ctx.font = `600 ${fontSize}px "Inter", sans-serif`; // Use a nice font
 
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
-            ctx.fillStyle = isSelected ? '#60A5FA' : 'rgba(255, 255, 255, 0.9)';
-            ctx.fillText(label, node.x, node.y + size + 2 + bckgDimensions[1] / 2);
+
+            // Text Shadow for readability without box
+            ctx.shadowColor = 'black';
+            ctx.shadowBlur = 4;
+            ctx.lineWidth = 3 / globalScale;
+            ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+            ctx.strokeText(label, node.x, node.y + size + fontSize);
+
+            ctx.fillStyle = isSelected ? '#60A5FA' : 'white';
+            ctx.fillText(label, node.x, node.y + size + fontSize);
+
+            ctx.shadowBlur = 0; // Reset again for other elements
           }}
-          linkColor={link => relColors[link.type] || '#64748B'}
-          linkWidth={2}
+          linkColor={link => {
+            // Helper for alpha
+            const hexToRgba = (hex, alpha) => {
+              const r = parseInt(hex.slice(1, 3), 16);
+              const g = parseInt(hex.slice(3, 5), 16);
+              const b = parseInt(hex.slice(5, 7), 16);
+              return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+            };
+
+            if (link.category === 2) return 'rgba(147, 51, 234, 0.85)'; // Purple, very bright
+            if (link.category === 3) return 'rgba(234, 179, 8, 0.65)';  // Yellow, bright
+
+            // Cat 1: dampen the "glow"
+            const color = relColors[link.type] || '#64748B';
+            return hexToRgba(color, 0.6); // Slightly transparent to kill neon glow
+          }}
+          linkWidth={link => {
+            if (link.category === 1) return 2;
+            if (link.category === 2) return 1.5;
+            return 1;
+          }}
+          linkLineDash={link => {
+            if (link.category === 2) return [8, 3]; // More solid
+            if (link.category === 3) return [4, 4]; // Distinct dots
+            return null;
+          }}
           backgroundColor="rgba(0,0,0,0)"
           cooldownTicks={100}
           enableNodeDrag={false}

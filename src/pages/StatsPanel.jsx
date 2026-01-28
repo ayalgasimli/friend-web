@@ -13,15 +13,28 @@ const StatsPanel = ({ nodes, links }) => {
             connectionCount[targetId] = (connectionCount[targetId] || 0) + 1;
         });
 
-        // Find most connected person
-        let mostConnected = null;
-        let maxConnections = 0;
+        // Sort people by connections
+        const sortedNodes = [...nodes].sort((a, b) => {
+            const connA = connectionCount[a.id] || 0;
+            const connB = connectionCount[b.id] || 0;
+            return connB - connA;
+        });
+
+        const topSocialites = sortedNodes.slice(0, 5);
+
+        // Vibe analysis
+        const vibeCounts = {};
         nodes.forEach(n => {
-            if (connectionCount[n.id] > maxConnections) {
-                maxConnections = connectionCount[n.id];
-                mostConnected = n;
+            if (n.vibe) {
+                // Normalize vibe (lowercase, trim)
+                const v = n.vibe.trim();
+                vibeCounts[v] = (vibeCounts[v] || 0) + 1;
             }
         });
+
+        const sortedVibes = Object.entries(vibeCounts)
+            .sort((a, b) => b[1] - a[1])
+            .slice(0, 8); // Top 8 vibes
 
         // Relationship type breakdown
         const typeBreakdown = {};
@@ -37,8 +50,10 @@ const StatsPanel = ({ nodes, links }) => {
         return {
             totalPeople: nodes.length,
             totalBonds: links.length,
-            mostConnected,
-            maxConnections,
+            topSocialites,
+            sortedVibes,
+            connectionCount, // specific count map for lookups
+            maxConnections: topSocialites[0] ? connectionCount[topSocialites[0].id] : 0,
             typeBreakdown,
             avgConnections
         };
@@ -85,28 +100,52 @@ const StatsPanel = ({ nodes, links }) => {
                     </div>
                 </div>
 
-                {/* Most Connected Person */}
-                {stats.mostConnected && (
+                <div className="grid grid-cols-1 md:grid-cols-2 gap-6">
+                    {/* Leaderboard */}
                     <div className="bg-white/5 backdrop-blur-xl p-6 rounded-2xl border border-white/10">
-                        <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4">Most Connected</h2>
-                        <div className="flex items-center gap-4">
-                            <div className="w-16 h-16 rounded-full border-2 border-yellow-500/50 shadow-[0_0_20px_rgba(234,179,8,0.3)] overflow-hidden">
-                                <img
-                                    src={stats.mostConnected.img || `https://api.dicebear.com/7.x/initials/svg?seed=${stats.mostConnected.name}`}
-                                    className="w-full h-full object-cover bg-slate-800"
-                                />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold text-white">{stats.mostConnected.name}</p>
-                                <p className="text-sm text-gray-400">{stats.mostConnected.vibe || 'No vibe set'}</p>
-                                <p className="text-xs text-yellow-400 mt-1">
-                                    <Star className="w-3 h-3 inline mr-1" />
-                                    {stats.maxConnections} connections
-                                </p>
-                            </div>
+                        <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <TrendingUp size={16} /> Top Socialites
+                        </h2>
+                        <div className="space-y-4">
+                            {stats.topSocialites.map((person, index) => (
+                                <div key={person.id} className="flex items-center gap-4 group">
+                                    <div className={`flex items-center justify-center w-8 h-8 rounded-full font-bold text-sm ${index === 0 ? 'bg-yellow-500 text-black' : index === 1 ? 'bg-gray-300 text-black' : index === 2 ? 'bg-amber-700 text-white' : 'bg-white/10 text-gray-400'}`}>
+                                        {index + 1}
+                                    </div>
+                                    <img
+                                        src={person.img || `https://api.dicebear.com/7.x/initials/svg?seed=${person.name}`}
+                                        className="w-10 h-10 rounded-full bg-slate-800 object-cover border border-white/10 group-hover:border-blue-500/50 transition"
+                                    />
+                                    <div className="flex-1">
+                                        <div className="flex justify-between items-center">
+                                            <p className="font-bold text-white group-hover:text-blue-400 transition">{person.name}</p>
+                                            <span className="text-xs font-mono text-gray-500">{stats.connectionCount[person.id]} bonds</span>
+                                        </div>
+                                        <div className="h-1.5 w-full bg-white/5 rounded-full mt-1 overflow-hidden">
+                                            <div style={{ width: `${(stats.connectionCount[person.id] / (stats.maxConnections || 1)) * 100}%` }} className="h-full bg-blue-500 rounded-full opacity-60 group-hover:opacity-100 transition" />
+                                        </div>
+                                    </div>
+                                </div>
+                            ))}
                         </div>
                     </div>
-                )}
+
+                    {/* Vibe Cloud */}
+                    <div className="bg-white/5 backdrop-blur-xl p-6 rounded-2xl border border-white/10">
+                        <h2 className="text-sm font-bold text-gray-500 uppercase tracking-widest mb-4 flex items-center gap-2">
+                            <Star size={16} /> Vibe Check
+                        </h2>
+                        <div className="flex flex-wrap gap-2">
+                            {stats.sortedVibes.length === 0 ? <p className="text-gray-500 italic">No vibes detected yet.</p> :
+                                stats.sortedVibes.map(([vibe, count], i) => (
+                                    <span key={vibe} className="px-3 py-1.5 bg-white/5 border border-white/10 rounded-full text-sm text-gray-300 flex items-center gap-2 hover:bg-white/10 hover:border-white/20 transition cursor-default">
+                                        {vibe}
+                                        <span className="bg-white/10 px-1.5 py-0.5 rounded-md text-xs text-gray-400">{count}</span>
+                                    </span>
+                                ))}
+                        </div>
+                    </div>
+                </div>
 
                 {/* Relationship Breakdown */}
                 <div className="bg-white/5 backdrop-blur-xl p-6 rounded-2xl border border-white/10">

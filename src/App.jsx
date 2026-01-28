@@ -5,6 +5,7 @@ import AdminPanel from './pages/AdminPanel';
 import StatsPanel from './pages/StatsPanel';
 import { supabase } from './supabase';
 import { Network, Settings, Loader2, BarChart3 } from 'lucide-react';
+import { generateImplicitLinks } from './utils/graphUtils';
 
 function App() {
   const [nodes, setNodes] = useState([]);
@@ -71,7 +72,7 @@ function App() {
         </Link>
       </nav>
       <Routes>
-        <Route path="/" element={<GraphView nodes={nodes} links={links} onRefresh={fetchData} />} />
+        <Route path="/" element={<GraphView nodes={nodes} links={generateImplicitLinks(nodes, links)} onRefresh={fetchData} />} />
         <Route path="/stats" element={<StatsPanel nodes={nodes} links={links} />} />
         <Route path="/admin" element={<AdminPanel nodes={nodes} links={links} refreshData={fetchData} />} />
       </Routes>

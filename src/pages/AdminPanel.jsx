@@ -339,6 +339,9 @@ const AdminPanel = ({ nodes, links = [], refreshData }) => {
         showToast("Error linking: " + error.message, 'error');
       } else {
         setLore('');
+        // Reset selections for cleaner workflow
+        // sourceId is kept sticky as requested
+        setTargetId('');
         showToast("Bond forged!");
         setIsSubmitting(false); // Unlock immediately
         refreshData(); // Refresh in background
@@ -456,7 +459,7 @@ const AdminPanel = ({ nodes, links = [], refreshData }) => {
             <div className="mt-8 pt-6 border-t border-white/10">
               <h3 className="font-bold text-xs text-gray-500 mb-3 uppercase tracking-widest">Population ({nodes.length})</h3>
               <div className="grid gap-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
-                {nodes.map(n => (
+                {[...nodes].sort((a, b) => a.name.localeCompare(b.name)).map(n => (
                   <div key={n.id} className="flex items-center justify-between bg-white/5 px-4 py-3 rounded-xl border border-white/5 hover:bg-white/10 transition group">
                     <div className="flex items-center gap-3">
                       {n.img && <img src={n.img} className="w-8 h-8 rounded-full" />}
@@ -496,18 +499,16 @@ const AdminPanel = ({ nodes, links = [], refreshData }) => {
                 <div className="flex gap-4">
                   <select className="w-1/2 bg-black/40 border border-white/10 p-3 rounded-lg text-gray-300" value={sourceId} onChange={e => setSourceId(e.target.value)}>
                     <option value="">Person A</option>
-                    {nodes.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+                    {[...nodes].sort((a, b) => a.name.localeCompare(b.name)).map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
                   </select>
                   <select className="w-1/2 bg-black/40 border border-white/10 p-3 rounded-lg text-gray-300" value={targetId} onChange={e => setTargetId(e.target.value)}>
                     <option value="">Person B</option>
-                    {nodes.map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
+                    {[...nodes].sort((a, b) => a.name.localeCompare(b.name)).map(n => <option key={n.id} value={n.id}>{n.name}</option>)}
                   </select>
                 </div>
                 <select className="w-full bg-black/40 border border-white/10 p-3 rounded-lg text-gray-300" value={relType} onChange={e => setRelType(e.target.value)}>
                   <option value="friend">Friend 🔵</option>
                   <option value="lover">Lover ❤️</option>
-                  <option value="colleague">Colleague 💛</option>
-                  <option value="acquaintance">Acquaintance ⚪</option>
                 </select>
                 <textarea className="w-full bg-black/40 border border-white/10 p-3 rounded-lg h-24 text-white" placeholder="The Lore..." value={lore} onChange={e => setLore(e.target.value)} />
                 <button
@@ -534,38 +535,43 @@ const AdminPanel = ({ nodes, links = [], refreshData }) => {
                 {links.length === 0 ? (
                   <p className="text-gray-500 text-center py-8">No bonds created yet</p>
                 ) : (
-                  links.map(rel => {
-                    const sourceId = rel.source?.id || rel.source;
-                    const targetId = rel.target?.id || rel.target;
+                  [...links]
+                    .sort((a, b) => {
+                      const sA = nodes.find(n => n.id === (a.source.id || a.source))?.name || '';
+                      const sB = nodes.find(n => n.id === (b.source.id || b.source))?.name || '';
+                      return sA.localeCompare(sB);
+                    })
+                    .map(rel => {
+                      const sourceId = rel.source?.id || rel.source;
+                      const targetId = rel.target?.id || rel.target;
 
-                    const source = nodes.find(n => n.id === sourceId);
-                    const target = nodes.find(n => n.id === targetId);
-                    return (
-                      <div key={rel.id} className="flex items-center justify-between bg-white/5 px-4 py-3 rounded-xl border border-white/5 hover:bg-white/10 transition group">
-                        <div className="flex items-center gap-3">
-                          <span className={`w-2 h-2 rounded-full ${getRelColor(rel.type)}`}></span>
-                          <span className="text-sm text-white">{source?.name || '?'}</span>
-                          <span className="text-gray-500">↔</span>
-                          <span className="text-sm text-white">{target?.name || '?'}</span>
-                          <span className="text-xs text-gray-500 ml-2">{rel.type}</span>
+                      const source = nodes.find(n => n.id === sourceId);
+                      const target = nodes.find(n => n.id === targetId);
+                      return (
+                        <div key={rel.id} className="flex items-center justify-between bg-white/5 px-4 py-3 rounded-xl border border-white/5 hover:bg-white/10 transition group">
+                          <div className="flex items-center gap-3">
+                            <span className={`w-2 h-2 rounded-full ${getRelColor(rel.type)}`}></span>
+                            <span className="text-sm text-white">{source?.name || '?'}</span>
+                            <span className="text-gray-500">↔</span>
+                            <span className="text-sm text-white">{target?.name || '?'}</span>
+                            <span className="text-xs text-gray-500 ml-2">{rel.type}</span>
+                          </div>
+                          <button
+                            onClick={() => handleDeleteRelationship(rel)}
+                            className={`p-2 rounded-lg transition flex items-center gap-1 ${deleteBondId === rel.id ? 'bg-red-500 text-white opacity-100' : 'hover:bg-red-500/20 opacity-0 group-hover:opacity-100'}`}
+                          >
+                            <Trash2 size={14} className={deleteBondId === rel.id ? 'text-white' : 'text-red-400'} />
+                            {deleteBondId === rel.id && <span className="text-xs font-bold">Sure?</span>}
+                          </button>
                         </div>
-                        <button
-                          onClick={() => handleDeleteRelationship(rel)}
-                          className={`p-2 rounded-lg transition flex items-center gap-1 ${deleteBondId === rel.id ? 'bg-red-500 text-white opacity-100' : 'hover:bg-red-500/20 opacity-0 group-hover:opacity-100'}`}
-                        >
-                          <Trash2 size={14} className={deleteBondId === rel.id ? 'text-white' : 'text-red-400'} />
-                          {deleteBondId === rel.id && <span className="text-xs font-bold">Sure?</span>}
-                        </button>
-                      </div>
-                    );
-                  })
+                      );
+                    })
                 )}
               </div>
             </div>
           </div>
         )}
-        {/* MIGRATION BUTTON - TEMPORARY */}
-        <div className="max-w-4xl mx-auto mt-8 flex justify-center">
+        <div className="max-w-4xl mx-auto mt-8 flex justify-center gap-4">
           <button
             onClick={async () => {
               if (!confirm('Fix legacy data? This turns "best_friend" into "friend".')) return;
@@ -577,21 +583,64 @@ const AdminPanel = ({ nodes, links = [], refreshData }) => {
           >
             Fix legacy data
           </button>
+          <button
+            onClick={async () => {
+              if (!confirm('Remove duplicate bonds? This will keep one instance of each pair.')) return;
+
+              // 1. Identify duplicates
+              const uniquePairs = new Set();
+              const duplicates = [];
+
+              links.forEach(link => {
+                const s = link.source.id || link.source;
+                const t = link.target.id || link.target;
+                // Store canonical pair key
+                const key = s < t ? `${s}-${t}` : `${t}-${s}`;
+
+                if (uniquePairs.has(key)) {
+                  duplicates.push(link.id);
+                } else {
+                  uniquePairs.add(key);
+                }
+              });
+
+              if (duplicates.length === 0) {
+                showToast("No duplicates found.", 'success');
+                return;
+              }
+
+              console.log("Removing duplicates:", duplicates);
+
+              // 2. Delete duplicates
+              const { error } = await supabase.from('relationships').delete().in('id', duplicates);
+
+              if (error) showToast("Error removing duplicates: " + error.message, 'error');
+              else {
+                showToast(`Removed ${duplicates.length} duplicate bonds.`);
+                refreshData();
+              }
+            }}
+            className="text-xs text-gray-600 hover:text-gray-400 underline"
+          >
+            Clean Duplicates
+          </button>
         </div>
       </div>
 
       {/* Edit Modal */}
-      {editingPerson && (
-        <EditModal
-          person={editingPerson}
-          onClose={() => setEditingPerson(null)}
-          onSave={handleUpdatePerson}
-        />
-      )}
+      {
+        editingPerson && (
+          <EditModal
+            person={editingPerson}
+            onClose={() => setEditingPerson(null)}
+            onSave={handleUpdatePerson}
+          />
+        )
+      }
 
       {/* Toast Notification */}
       {toast && <Toast message={toast.message} type={toast.type} onClose={() => setToast(null)} />}
-    </div>
+    </div >
   );
 };
 
