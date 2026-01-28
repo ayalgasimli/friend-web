@@ -3,7 +3,7 @@ import ForceGraph2D from 'react-force-graph-2d';
 import { supabase } from '../supabase';
 import { Trash2, Menu, X } from 'lucide-react';
 
-const GraphView = ({ nodes, links, onRefresh }) => {
+const GraphView = ({ nodes, links, onRefresh, session }) => {
   const [selected, setSelected] = useState(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState(false);
   const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
@@ -19,9 +19,9 @@ const GraphView = ({ nodes, links, onRefresh }) => {
     const handleResize = () => {
       const width = window.innerWidth;
       const height = window.innerHeight;
-      
+
       setWindowSize({ width, height });
-      
+
       // Auto-open sidebar on desktop, auto-close on mobile
       if (width >= 768) {
         setIsSidebarOpen(true);
@@ -115,11 +115,11 @@ const GraphView = ({ nodes, links, onRefresh }) => {
   const graphHeight = windowSize.height;
 
   return (
-    <div style={{ 
-      width: '100vw', 
-      height: '100vh', 
-      background: '#050505', 
-      position: 'relative', 
+    <div style={{
+      width: '100vw',
+      height: '100vh',
+      background: '#050505',
+      position: 'relative',
       display: 'flex',
       overflow: 'hidden'
     }}>
@@ -164,23 +164,23 @@ const GraphView = ({ nodes, links, onRefresh }) => {
         transition: 'transform 0.3s ease-in-out',
         boxShadow: isMobile && isSidebarOpen ? '2px 0 10px rgba(0,0,0,0.5)' : 'none'
       }}>
-        <div style={{ 
-          display: 'flex', 
-          justifyContent: 'space-between', 
-          alignItems: 'center', 
-          marginBottom: 15, 
-          borderBottom: '2px solid #3B82F6', 
-          paddingBottom: 10 
+        <div style={{
+          display: 'flex',
+          justifyContent: 'space-between',
+          alignItems: 'center',
+          marginBottom: 15,
+          borderBottom: '2px solid #3B82F6',
+          paddingBottom: 10
         }}>
           <h2 style={{ color: 'white', fontSize: 18, margin: 0, fontWeight: 600 }}>
             People ({nodes.length})
           </h2>
           {isMobile && (
-            <button 
-              onClick={() => setIsSidebarOpen(false)} 
-              style={{ 
-                background: 'none', 
-                border: 'none', 
+            <button
+              onClick={() => setIsSidebarOpen(false)}
+              style={{
+                background: 'none',
+                border: 'none',
                 color: 'white',
                 cursor: 'pointer',
                 padding: 5
@@ -194,9 +194,9 @@ const GraphView = ({ nodes, links, onRefresh }) => {
         {nodes.map(node => (
           <div
             key={node.id}
-            onClick={() => { 
-              setSelected(node); 
-              if (isMobile) setIsSidebarOpen(false); 
+            onClick={() => {
+              setSelected(node);
+              if (isMobile) setIsSidebarOpen(false);
             }}
             style={{
               cursor: 'pointer',
@@ -213,15 +213,15 @@ const GraphView = ({ nodes, links, onRefresh }) => {
             onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'}
             onMouseLeave={(e) => e.currentTarget.style.background = selected?.id === node.id ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255,255,255,0.05)'}
           >
-            <img 
-              src={node.img || `https://api.dicebear.com/7.x/initials/svg?seed=${node.name}`} 
-              style={{ width: 35, height: 35, borderRadius: '50%', objectFit: 'cover' }} 
-              alt={node.name} 
+            <img
+              src={node.img || `https://api.dicebear.com/7.x/initials/svg?seed=${node.name}`}
+              style={{ width: 35, height: 35, borderRadius: '50%', objectFit: 'cover' }}
+              alt={node.name}
             />
             <div style={{ flex: 1, minWidth: 0 }}>
-              <div style={{ 
-                color: 'white', 
-                fontSize: 14, 
+              <div style={{
+                color: 'white',
+                fontSize: 14,
                 fontWeight: 500,
                 overflow: 'hidden',
                 textOverflow: 'ellipsis',
@@ -230,8 +230,8 @@ const GraphView = ({ nodes, links, onRefresh }) => {
                 {node.name}
               </div>
               {node.vibe && (
-                <div style={{ 
-                  color: '#888', 
+                <div style={{
+                  color: '#888',
                   fontSize: 11,
                   overflow: 'hidden',
                   textOverflow: 'ellipsis',
@@ -252,11 +252,11 @@ const GraphView = ({ nodes, links, onRefresh }) => {
           borderRadius: 12,
           border: '1px solid rgba(255,255,255,0.1)'
         }}>
-          <h3 style={{ 
-            color: '#888', 
-            fontSize: 11, 
-            textTransform: 'uppercase', 
-            letterSpacing: 1.5, 
+          <h3 style={{
+            color: '#888',
+            fontSize: 11,
+            textTransform: 'uppercase',
+            letterSpacing: 1.5,
             marginBottom: 12,
             fontWeight: 600
           }}>
@@ -292,8 +292,8 @@ const GraphView = ({ nodes, links, onRefresh }) => {
       </div>
 
       {/* GRAPH */}
-      <div style={{ 
-        flex: 1, 
+      <div style={{
+        flex: 1,
         position: 'relative',
         width: graphWidth,
         height: graphHeight
@@ -430,31 +430,33 @@ const GraphView = ({ nodes, links, onRefresh }) => {
           boxShadow: isMobile ? '0 -4px 20px rgba(0,0,0,0.5)' : 'none',
           transition: 'transform 0.3s ease-in-out'
         }}>
-          <div style={{ 
-            display: 'flex', 
-            justifyContent: 'flex-end', 
+          <div style={{
+            display: 'flex',
+            justifyContent: 'flex-end',
             gap: 8,
             marginBottom: 20
           }}>
-            <button
-              onClick={() => handleDelete(selected)}
-              style={{
-                background: deleteConfirmation ? 'rgba(220, 38, 38, 0.4)' : 'rgba(239, 68, 68, 0.2)',
-                border: deleteConfirmation ? '1px solid #EF4444' : '1px solid rgba(239, 68, 68, 0.5)',
-                color: deleteConfirmation ? '#FECACA' : '#FCA5A5',
-                padding: '8px 12px',
-                borderRadius: 6,
-                cursor: 'pointer',
-                fontSize: 13,
-                display: 'flex',
-                alignItems: 'center',
-                gap: 6,
-                fontWeight: deleteConfirmation ? 'bold' : 'normal',
-                transition: 'all 0.2s'
-              }}
-            >
-              <Trash2 size={14} /> {deleteConfirmation ? 'Sure?' : 'Delete'}
-            </button>
+            {session && (
+              <button
+                onClick={() => handleDelete(selected)}
+                style={{
+                  background: deleteConfirmation ? 'rgba(220, 38, 38, 0.4)' : 'rgba(239, 68, 68, 0.2)',
+                  border: deleteConfirmation ? '1px solid #EF4444' : '1px solid rgba(239, 68, 68, 0.5)',
+                  color: deleteConfirmation ? '#FECACA' : '#FCA5A5',
+                  padding: '8px 12px',
+                  borderRadius: 6,
+                  cursor: 'pointer',
+                  fontSize: 13,
+                  display: 'flex',
+                  alignItems: 'center',
+                  gap: 6,
+                  fontWeight: deleteConfirmation ? 'bold' : 'normal',
+                  transition: 'all 0.2s'
+                }}
+              >
+                <Trash2 size={14} /> {deleteConfirmation ? 'Sure?' : 'Delete'}
+              </button>
+            )}
 
             <button
               onClick={() => setSelected(null)}
@@ -477,10 +479,10 @@ const GraphView = ({ nodes, links, onRefresh }) => {
           <div style={{ textAlign: 'center' }}>
             <div style={{ position: 'relative', display: 'inline-block', marginBottom: 15 }}>
               {selected.emoji && (
-                <span style={{ 
-                  position: 'absolute', 
-                  top: -8, 
-                  right: -8, 
+                <span style={{
+                  position: 'absolute',
+                  top: -8,
+                  right: -8,
                   fontSize: isMobile ? 28 : 35,
                   zIndex: 1
                 }}>
@@ -489,11 +491,11 @@ const GraphView = ({ nodes, links, onRefresh }) => {
               )}
               <img
                 src={selected.img || `https://api.dicebear.com/7.x/initials/svg?seed=${selected.name}`}
-                style={{ 
-                  width: isMobile ? 100 : 120, 
-                  height: isMobile ? 100 : 120, 
-                  borderRadius: '50%', 
-                  border: '4px solid #3B82F6', 
+                style={{
+                  width: isMobile ? 100 : 120,
+                  height: isMobile ? 100 : 120,
+                  borderRadius: '50%',
+                  border: '4px solid #3B82F6',
                   boxShadow: '0 0 30px rgba(59, 130, 246, 0.5)',
                   objectFit: 'cover'
                 }}
@@ -501,9 +503,9 @@ const GraphView = ({ nodes, links, onRefresh }) => {
               />
             </div>
 
-            <h2 style={{ 
-              margin: '10px 0 5px', 
-              fontSize: isMobile ? 24 : 28, 
+            <h2 style={{
+              margin: '10px 0 5px',
+              fontSize: isMobile ? 24 : 28,
               fontWeight: 'bold',
               color: 'white'
             }}>
@@ -511,13 +513,13 @@ const GraphView = ({ nodes, links, onRefresh }) => {
             </h2>
 
             {selected.vibe && (
-              <p style={{ 
-                color: '#60A5FA', 
-                fontSize: 12, 
-                margin: '8px 0', 
-                background: 'rgba(59, 130, 246, 0.2)', 
-                padding: '6px 15px', 
-                borderRadius: 20, 
+              <p style={{
+                color: '#60A5FA',
+                fontSize: 12,
+                margin: '8px 0',
+                background: 'rgba(59, 130, 246, 0.2)',
+                padding: '6px 15px',
+                borderRadius: 20,
                 display: 'inline-block',
                 border: '1px solid rgba(59, 130, 246, 0.3)'
               }}>
@@ -527,13 +529,13 @@ const GraphView = ({ nodes, links, onRefresh }) => {
 
             {selected.bio && (
               <div style={{ marginTop: 20, textAlign: 'left' }}>
-                <p style={{ 
-                  color: '#ccc', 
-                  fontSize: 13, 
-                  fontStyle: 'italic', 
-                  padding: 15, 
-                  background: 'rgba(255,255,255,0.05)', 
-                  borderRadius: 10, 
+                <p style={{
+                  color: '#ccc',
+                  fontSize: 13,
+                  fontStyle: 'italic',
+                  padding: 15,
+                  background: 'rgba(255,255,255,0.05)',
+                  borderRadius: 10,
                   lineHeight: 1.6,
                   border: '1px solid rgba(255,255,255,0.05)'
                 }}>
@@ -542,35 +544,35 @@ const GraphView = ({ nodes, links, onRefresh }) => {
               </div>
             )}
 
-            <div style={{ 
-              marginTop: 20, 
-              textAlign: 'left', 
-              display: 'flex', 
-              flexDirection: 'column', 
-              gap: 8 
+            <div style={{
+              marginTop: 20,
+              textAlign: 'left',
+              display: 'flex',
+              flexDirection: 'column',
+              gap: 8
             }}>
               {selected.birthday && (
-                <div style={{ 
-                  fontSize: 13, 
-                  color: '#aaa', 
-                  padding: 10, 
-                  background: 'rgba(255,255,255,0.03)', 
+                <div style={{
+                  fontSize: 13,
+                  color: '#aaa',
+                  padding: 10,
+                  background: 'rgba(255,255,255,0.03)',
                   borderRadius: 8,
                   border: '1px solid rgba(255,255,255,0.05)'
                 }}>
-                  🎂 {new Date(selected.birthday).toLocaleDateString('en-US', { 
-                    month: 'long', 
-                    day: 'numeric', 
-                    year: 'numeric' 
+                  🎂 {new Date(selected.birthday).toLocaleDateString('en-US', {
+                    month: 'long',
+                    day: 'numeric',
+                    year: 'numeric'
                   })}
                 </div>
               )}
               {selected.location && (
-                <div style={{ 
-                  fontSize: 13, 
-                  color: '#aaa', 
-                  padding: 10, 
-                  background: 'rgba(255,255,255,0.03)', 
+                <div style={{
+                  fontSize: 13,
+                  color: '#aaa',
+                  padding: 10,
+                  background: 'rgba(255,255,255,0.03)',
                   borderRadius: 8,
                   border: '1px solid rgba(255,255,255,0.05)'
                 }}>
@@ -629,24 +631,24 @@ const GraphView = ({ nodes, links, onRefresh }) => {
             )}
 
             <div style={{ marginTop: 25, textAlign: 'left' }}>
-              <h3 style={{ 
-                fontSize: 11, 
-                color: '#888', 
-                textTransform: 'uppercase', 
-                letterSpacing: 2, 
-                borderBottom: '1px solid rgba(255,255,255,0.1)', 
-                paddingBottom: 10, 
+              <h3 style={{
+                fontSize: 11,
+                color: '#888',
+                textTransform: 'uppercase',
+                letterSpacing: 2,
+                borderBottom: '1px solid rgba(255,255,255,0.1)',
+                paddingBottom: 10,
                 marginBottom: 15,
                 fontWeight: 600
               }}>
-                Connections ({links.filter(l => 
-                  (l.source?.id || l.source) === selected.id || 
+                Connections ({links.filter(l =>
+                  (l.source?.id || l.source) === selected.id ||
                   (l.target?.id || l.target) === selected.id
                 ).length})
               </h3>
 
-              {links.filter(l => 
-                (l.source?.id || l.source) === selected.id || 
+              {links.filter(l =>
+                (l.source?.id || l.source) === selected.id ||
                 (l.target?.id || l.target) === selected.id
               ).map((link, i) => {
                 const sId = link.source?.id || link.source;
@@ -673,19 +675,19 @@ const GraphView = ({ nodes, links, onRefresh }) => {
                     onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
                     onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
                   >
-                    <img 
-                      src={other?.img || `https://api.dicebear.com/7.x/initials/svg?seed=${other?.name}`} 
-                      style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover' }} 
-                      alt={other?.name} 
+                    <img
+                      src={other?.img || `https://api.dicebear.com/7.x/initials/svg?seed=${other?.name}`}
+                      style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover' }}
+                      alt={other?.name}
                     />
                     <span style={{ flex: 1, fontWeight: 500, color: 'white' }}>
                       {other?.name || 'Unknown'}
                     </span>
-                    <span style={{ 
-                      fontSize: 10, 
-                      color: '#888', 
-                      background: 'rgba(0,0,0,0.4)', 
-                      padding: '4px 8px', 
+                    <span style={{
+                      fontSize: 10,
+                      color: '#888',
+                      background: 'rgba(0,0,0,0.4)',
+                      padding: '4px 8px',
                       borderRadius: 4,
                       textTransform: 'capitalize'
                     }}>
@@ -695,20 +697,20 @@ const GraphView = ({ nodes, links, onRefresh }) => {
                 );
               })}
 
-              {links.filter(l => 
-                (l.source?.id || l.source) === selected.id || 
+              {links.filter(l =>
+                (l.source?.id || l.source) === selected.id ||
                 (l.target?.id || l.target) === selected.id
               ).length === 0 && (
-                <p style={{ 
-                  color: '#666', 
-                  textAlign: 'center', 
-                  padding: 20, 
-                  fontSize: 13, 
-                  fontStyle: 'italic' 
-                }}>
-                  No connections yet
-                </p>
-              )}
+                  <p style={{
+                    color: '#666',
+                    textAlign: 'center',
+                    padding: 20,
+                    fontSize: 13,
+                    fontStyle: 'italic'
+                  }}>
+                    No connections yet
+                  </p>
+                )}
             </div>
           </div>
         </div>
