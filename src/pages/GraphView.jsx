@@ -1,27 +1,41 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { supabase } from '../supabase';
-import { Trash2 } from 'lucide-react';
+import { Trash2, Menu, X } from 'lucide-react';
 
 const GraphView = ({ nodes, links, onRefresh }) => {
   const [selected, setSelected] = useState(null);
   const [deleteConfirmation, setDeleteConfirmation] = useState(false);
-  const [hasZoomedOnce, setHasZoomedOnce] = useState(false);
+  const [isSidebarOpen, setIsSidebarOpen] = useState(window.innerWidth >= 768);
+  const [windowSize, setWindowSize] = useState({
+    width: window.innerWidth,
+    height: window.innerHeight
+  });
   const graphRef = useRef();
   const imageCache = useRef({});
 
-  // Focus on selected person
+  // Handle window resize
   useEffect(() => {
-    if (graphRef.current) {
-      if (selected) {
-        // Zoom in and center on the person
-        graphRef.current.centerAt(selected.x, selected.y, 1000);
-        graphRef.current.zoom(8, 2000);
+    const handleResize = () => {
+      const width = window.innerWidth;
+      const height = window.innerHeight;
+      
+      setWindowSize({ width, height });
+      
+      // Auto-open sidebar on desktop, auto-close on mobile
+      if (width >= 768) {
+        setIsSidebarOpen(true);
       } else {
-        // Zoom out to see everyone when closed
-        graphRef.current.zoomToFit(1000, 50);
+        setIsSidebarOpen(false);
       }
-    }
+    };
+
+    window.addEventListener('resize', handleResize);
+    return () => window.removeEventListener('resize', handleResize);
+  }, []);
+
+  // Reset delete confirmation when selection changes
+  useEffect(() => {
     setDeleteConfirmation(false);
   }, [selected]);
 
@@ -44,13 +58,8 @@ const GraphView = ({ nodes, links, onRefresh }) => {
       graphRef.current.d3Force('charge', null);
       graphRef.current.d3Force('link', null);
       graphRef.current.d3Force('center', null);
-
-      // Zoom to fit on initial load (after a delay for sim to settle)
-      setTimeout(() => {
-        graphRef.current?.zoomToFit(400, 50);
-      }, 500);
     }
-  }, []);
+  }, [nodes.length]);
 
   const relColors = {
     lover: '#EF4444',
@@ -60,25 +69,28 @@ const GraphView = ({ nodes, links, onRefresh }) => {
   };
 
   const handleDelete = async (person) => {
-    // If confirmation is not yet true, set it to true and return
     if (!deleteConfirmation) {
       setDeleteConfirmation(true);
       return;
     }
 
     console.log('Attempting to delete:', person.name);
-
     console.log('Deleting relationships for:', person.id);
-    // Delete relationships first
-    const { error: relError } = await supabase.from('relationships').delete().or(`source.eq.${person.id},target.eq.${person.id}`);
+
+    const { error: relError } = await supabase
+      .from('relationships')
+      .delete()
+      .or(`source.eq.${person.id},target.eq.${person.id}`);
 
     if (relError) {
       console.error('Error deleting relationships:', relError);
     }
 
     console.log('Deleting profile:', person.id);
-    // Delete profile
-    const { error } = await supabase.from('profiles').delete().eq('id', person.id);
+    const { error } = await supabase
+      .from('profiles')
+      .delete()
+      .eq('id', person.id);
 
     if (error) {
       console.error('Error deleting profile:', error);
@@ -95,16 +107,97 @@ const GraphView = ({ nodes, links, onRefresh }) => {
     }
   };
 
-  return (
-    <div style={{ width: '100vw', height: '100vh', background: '#050505', position: 'relative', display: 'flex' }}>
+  // Calculate graph dimensions
+  const isMobile = windowSize.width < 768;
+  const leftSidebarWidth = isMobile ? 0 : (isSidebarOpen ? 250 : 0);
+  const rightSidebarWidth = isMobile ? 0 : (selected ? 350 : 0);
+  const graphWidth = windowSize.width - leftSidebarWidth - rightSidebarWidth;
+  const graphHeight = windowSize.height;
 
-      {/* LEFT SIDEBAR - CLICKABLE PEOPLE LIST */}
-      <div style={{ width: 250, background: 'rgba(0,0,0,0.9)', borderRight: '1px solid rgba(255,255,255,0.1)', padding: 20, overflowY: 'auto', zIndex: 5 }}>
-        <h2 style={{ color: 'white', fontSize: 18, marginBottom: 15, borderBottom: '2px solid #3B82F6', paddingBottom: 10 }}>People ({nodes.length})</h2>
+  return (
+    <div style={{ 
+      width: '100vw', 
+      height: '100vh', 
+      background: '#050505', 
+      position: 'relative', 
+      display: 'flex',
+      overflow: 'hidden'
+    }}>
+
+      {/* TOGGLE BUTTON */}
+      <button
+        onClick={() => setIsSidebarOpen(!isSidebarOpen)}
+        style={{
+          position: 'absolute',
+          top: 20,
+          left: 20,
+          zIndex: 60,
+          background: 'rgba(0,0,0,0.8)',
+          border: '1px solid rgba(255,255,255,0.2)',
+          color: 'white',
+          padding: 10,
+          borderRadius: 8,
+          cursor: 'pointer',
+          display: isMobile || !isSidebarOpen ? 'flex' : 'none',
+          alignItems: 'center',
+          justifyContent: 'center',
+          boxShadow: '0 4px 6px rgba(0,0,0,0.3)'
+        }}
+      >
+        {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
+      </button>
+
+      {/* LEFT SIDEBAR - PEOPLE LIST */}
+      <div style={{
+        width: isMobile ? '85vw' : 250,
+        maxWidth: isMobile ? 320 : 250,
+        background: 'rgba(0,0,0,0.95)',
+        borderRight: '1px solid rgba(255,255,255,0.1)',
+        padding: 20,
+        overflowY: 'auto',
+        zIndex: 55,
+        position: isMobile ? 'fixed' : 'relative',
+        height: '100%',
+        left: 0,
+        top: 0,
+        transform: isSidebarOpen ? 'translateX(0)' : 'translateX(-100%)',
+        transition: 'transform 0.3s ease-in-out',
+        boxShadow: isMobile && isSidebarOpen ? '2px 0 10px rgba(0,0,0,0.5)' : 'none'
+      }}>
+        <div style={{ 
+          display: 'flex', 
+          justifyContent: 'space-between', 
+          alignItems: 'center', 
+          marginBottom: 15, 
+          borderBottom: '2px solid #3B82F6', 
+          paddingBottom: 10 
+        }}>
+          <h2 style={{ color: 'white', fontSize: 18, margin: 0, fontWeight: 600 }}>
+            People ({nodes.length})
+          </h2>
+          {isMobile && (
+            <button 
+              onClick={() => setIsSidebarOpen(false)} 
+              style={{ 
+                background: 'none', 
+                border: 'none', 
+                color: 'white',
+                cursor: 'pointer',
+                padding: 5
+              }}
+            >
+              <X size={18} />
+            </button>
+          )}
+        </div>
+
         {nodes.map(node => (
           <div
             key={node.id}
-            onClick={() => setSelected(node)}
+            onClick={() => { 
+              setSelected(node); 
+              if (isMobile) setIsSidebarOpen(false); 
+            }}
             style={{
               cursor: 'pointer',
               padding: 12,
@@ -120,10 +213,33 @@ const GraphView = ({ nodes, links, onRefresh }) => {
             onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'}
             onMouseLeave={(e) => e.currentTarget.style.background = selected?.id === node.id ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255,255,255,0.05)'}
           >
-            <img src={node.img || `https://api.dicebear.com/7.x/initials/svg?seed=${node.name}`} style={{ width: 35, height: 35, borderRadius: '50%' }} alt={node.name} />
-            <div>
-              <div style={{ color: 'white', fontSize: 14, fontWeight: 500 }}>{node.name}</div>
-              {node.vibe && <div style={{ color: '#888', fontSize: 11 }}>{node.vibe}</div>}
+            <img 
+              src={node.img || `https://api.dicebear.com/7.x/initials/svg?seed=${node.name}`} 
+              style={{ width: 35, height: 35, borderRadius: '50%', objectFit: 'cover' }} 
+              alt={node.name} 
+            />
+            <div style={{ flex: 1, minWidth: 0 }}>
+              <div style={{ 
+                color: 'white', 
+                fontSize: 14, 
+                fontWeight: 500,
+                overflow: 'hidden',
+                textOverflow: 'ellipsis',
+                whiteSpace: 'nowrap'
+              }}>
+                {node.name}
+              </div>
+              {node.vibe && (
+                <div style={{ 
+                  color: '#888', 
+                  fontSize: 11,
+                  overflow: 'hidden',
+                  textOverflow: 'ellipsis',
+                  whiteSpace: 'nowrap'
+                }}>
+                  {node.vibe}
+                </div>
+              )}
             </div>
           </div>
         ))}
@@ -136,7 +252,16 @@ const GraphView = ({ nodes, links, onRefresh }) => {
           borderRadius: 12,
           border: '1px solid rgba(255,255,255,0.1)'
         }}>
-          <h3 style={{ color: '#888', fontSize: 11, textTransform: 'uppercase', letterSpacing: 1.5, marginBottom: 12 }}>Bond Types</h3>
+          <h3 style={{ 
+            color: '#888', 
+            fontSize: 11, 
+            textTransform: 'uppercase', 
+            letterSpacing: 1.5, 
+            marginBottom: 12,
+            fontWeight: 600
+          }}>
+            Bond Types
+          </h3>
           <div style={{ display: 'flex', flexDirection: 'column', gap: 8 }}>
             <div style={{ display: 'flex', alignItems: 'center', gap: 10 }}>
               <div style={{ width: 20, height: 4, background: '#3B82F6', borderRadius: 2 }} />
@@ -167,37 +292,38 @@ const GraphView = ({ nodes, links, onRefresh }) => {
       </div>
 
       {/* GRAPH */}
-      <div style={{ flex: 1, position: 'relative' }}>
+      <div style={{ 
+        flex: 1, 
+        position: 'relative',
+        width: graphWidth,
+        height: graphHeight
+      }}>
         <ForceGraph2D
           ref={graphRef}
-          width={window.innerWidth - (window.innerWidth >= 768 && selected ? 350 : 0)}
-          height={window.innerHeight}
+          width={graphWidth}
+          height={graphHeight}
           graphData={{
             nodes: nodes.map((node, i) => {
-              // "Round Table" Layout
               const count = nodes.length;
-              // Dynamic radius based on screen size (min dimension), but keep some padding
-              const minDim = Math.min(window.innerWidth, window.innerHeight);
-              const layoutRadius = Math.max(150, minDim * 0.35); // at least 150px, or 35% of screen
+              const minDim = Math.min(graphWidth, graphHeight);
+              const layoutRadius = Math.max(120, minDim * 0.3);
               const angle = (i / count) * 2 * Math.PI;
 
               return {
                 ...node,
-                // Fix position to circle
                 fx: layoutRadius * Math.cos(angle),
                 fy: layoutRadius * Math.sin(angle)
               };
             }),
-            links: links.map(link => ({ ...link }))   // Shallow copy to prevent mutation of state
+            links: links.map(link => ({ ...link }))
           }}
           nodeLabel="name"
           nodeAutoColorBy="id"
           nodeRelSize={10}
           nodeCanvasObject={(node, ctx, globalScale) => {
-            const size = 12;
+            const size = isMobile ? 10 : 12;
             const isSelected = selected?.id === node.id;
 
-            // Draw Glow / Selection Effect
             if (isSelected) {
               ctx.shadowColor = '#60A5FA';
               ctx.shadowBlur = 20;
@@ -206,16 +332,13 @@ const GraphView = ({ nodes, links, onRefresh }) => {
               ctx.shadowBlur = 0;
             }
 
-            // Draw circle background
             ctx.beginPath();
             ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
             ctx.fillStyle = isSelected ? '#1e293b' : '#0f172a';
             ctx.fill();
 
-            // Reset shadow for image to stay crisp
             ctx.shadowBlur = 0;
 
-            // Draw Image
             const imgSrc = node.img || `https://api.dicebear.com/7.x/initials/svg?seed=${node.name}`;
             const img = imageCache.current[imgSrc];
             if (img && img.complete && img.naturalHeight !== 0) {
@@ -227,23 +350,19 @@ const GraphView = ({ nodes, links, onRefresh }) => {
               ctx.restore();
             }
 
-            // Draw Ring
             ctx.beginPath();
             ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
             ctx.lineWidth = isSelected ? 3 / globalScale : 1.5 / globalScale;
             ctx.strokeStyle = isSelected ? '#60A5FA' : 'rgba(255,255,255,0.2)';
             ctx.stroke();
 
-            // Draw Label only if zoomed in or hovered/selected
-            // Simplistic LOD: always show for now, but style it better
             const label = node.name;
-            const fontSize = 14 / globalScale;
-            ctx.font = `600 ${fontSize}px "Inter", sans-serif`; // Use a nice font
+            const fontSize = (isMobile ? 12 : 14) / globalScale;
+            ctx.font = `600 ${fontSize}px "Inter", -apple-system, BlinkMacSystemFont, sans-serif`;
 
             ctx.textAlign = 'center';
             ctx.textBaseline = 'middle';
 
-            // Text Shadow for readability without box
             ctx.shadowColor = 'black';
             ctx.shadowBlur = 4;
             ctx.lineWidth = 3 / globalScale;
@@ -253,10 +372,9 @@ const GraphView = ({ nodes, links, onRefresh }) => {
             ctx.fillStyle = isSelected ? '#60A5FA' : 'white';
             ctx.fillText(label, node.x, node.y + size + fontSize);
 
-            ctx.shadowBlur = 0; // Reset again for other elements
+            ctx.shadowBlur = 0;
           }}
           linkColor={link => {
-            // Helper for alpha
             const hexToRgba = (hex, alpha) => {
               const r = parseInt(hex.slice(1, 3), 16);
               const g = parseInt(hex.slice(3, 5), 16);
@@ -264,113 +382,205 @@ const GraphView = ({ nodes, links, onRefresh }) => {
               return `rgba(${r}, ${g}, ${b}, ${alpha})`;
             };
 
-            if (link.category === 2) return 'rgba(147, 51, 234, 0.85)'; // Purple, very bright
-            if (link.category === 3) return 'rgba(234, 179, 8, 0.65)';  // Yellow, bright
+            if (link.category === 2) return 'rgba(147, 51, 234, 0.85)';
+            if (link.category === 3) return 'rgba(234, 179, 8, 0.65)';
 
-            // Cat 1: dampen the "glow"
             const color = relColors[link.type] || '#64748B';
-            return hexToRgba(color, 0.6); // Slightly transparent to kill neon glow
+            return hexToRgba(color, 0.6);
           }}
           linkWidth={link => {
-            if (link.category === 1) return 2;
-            if (link.category === 2) return 1.5;
-            return 1;
+            if (link.category === 1) return isMobile ? 1.5 : 2;
+            if (link.category === 2) return isMobile ? 1 : 1.5;
+            return isMobile ? 0.8 : 1;
           }}
           linkLineDash={link => {
-            if (link.category === 2) return [8, 3]; // More solid
-            if (link.category === 3) return [4, 4]; // Distinct dots
+            if (link.category === 2) return [8, 3];
+            if (link.category === 3) return [4, 4];
             return null;
           }}
           backgroundColor="rgba(0,0,0,0)"
           cooldownTicks={100}
           enableNodeDrag={false}
-          onEngineStop={() => {
-            if (!hasZoomedOnce && graphRef.current) {
-              graphRef.current.zoomToFit(400, 50);
-              setHasZoomedOnce(true);
-            }
+          onNodeClick={(node) => {
+            setSelected(node);
+            if (isMobile) setIsSidebarOpen(false);
           }}
         />
       </div>
 
       {/* RIGHT SIDEBAR - PROFILE */}
       {selected && (
-        <div className="fixed bottom-0 left-0 w-full md:top-0 md:right-0 md:left-auto md:w-[350px] md:h-screen bg-[#0a0a0a]/95 backdrop-blur-xl border-t md:border-t-0 md:border-l border-white/10 p-6 z-50 transition-all duration-300 shadow-2xl rounded-t-3xl md:rounded-none md:rounded-l-3xl max-h-[80vh] md:max-h-screen overflow-y-auto pt-16 md:pt-6">
-          <button
-            onClick={() => setSelected(null)}
-            style={{
-              float: 'right',
-              background: 'rgba(255,255,255,0.1)',
-              border: 'none',
-              color: 'white',
-              padding: '8px 15px',
-              borderRadius: 5,
-              cursor: 'pointer',
-              fontSize: 14,
-              fontWeight: 600,
-              marginLeft: 10
-            }}
-          >
-            ✕ Close
-          </button>
+        <div style={{
+          position: 'fixed',
+          bottom: isMobile ? 0 : 'auto',
+          top: isMobile ? 'auto' : 0,
+          right: 0,
+          left: isMobile ? 0 : 'auto',
+          width: isMobile ? '100%' : 350,
+          height: isMobile ? 'auto' : '100vh',
+          maxHeight: isMobile ? '85vh' : '100vh',
+          background: 'rgba(10, 10, 10, 0.98)',
+          backdropFilter: 'blur(20px)',
+          borderTop: isMobile ? '1px solid rgba(255,255,255,0.1)' : 'none',
+          borderLeft: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)',
+          padding: isMobile ? '20px 20px 30px' : 24,
+          zIndex: 50,
+          overflowY: 'auto',
+          borderRadius: isMobile ? '24px 24px 0 0' : 0,
+          boxShadow: isMobile ? '0 -4px 20px rgba(0,0,0,0.5)' : 'none',
+          transition: 'transform 0.3s ease-in-out'
+        }}>
+          <div style={{ 
+            display: 'flex', 
+            justifyContent: 'flex-end', 
+            gap: 8,
+            marginBottom: 20
+          }}>
+            <button
+              onClick={() => handleDelete(selected)}
+              style={{
+                background: deleteConfirmation ? 'rgba(220, 38, 38, 0.4)' : 'rgba(239, 68, 68, 0.2)',
+                border: deleteConfirmation ? '1px solid #EF4444' : '1px solid rgba(239, 68, 68, 0.5)',
+                color: deleteConfirmation ? '#FECACA' : '#FCA5A5',
+                padding: '8px 12px',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontSize: 13,
+                display: 'flex',
+                alignItems: 'center',
+                gap: 6,
+                fontWeight: deleteConfirmation ? 'bold' : 'normal',
+                transition: 'all 0.2s'
+              }}
+            >
+              <Trash2 size={14} /> {deleteConfirmation ? 'Sure?' : 'Delete'}
+            </button>
 
-          <button
-            onClick={() => handleDelete(selected)}
-            style={{
-              float: 'right',
-              background: deleteConfirmation ? 'rgba(220, 38, 38, 0.4)' : 'rgba(239, 68, 68, 0.2)',
-              border: deleteConfirmation ? '1px solid #EF4444' : '1px solid rgba(239, 68, 68, 0.5)',
-              color: deleteConfirmation ? '#FECACA' : '#FCA5A5',
-              padding: '8px 15px',
-              borderRadius: 5,
-              cursor: 'pointer',
-              fontSize: 14,
-              display: 'flex',
-              alignItems: 'center',
-              gap: 5,
-              fontWeight: deleteConfirmation ? 'bold' : 'normal',
-              transition: 'all 0.2s'
-            }}
-          >
-            <Trash2 size={14} /> {deleteConfirmation ? 'Are you sure?' : 'Delete'}
-          </button>
+            <button
+              onClick={() => setSelected(null)}
+              style={{
+                background: 'rgba(255,255,255,0.1)',
+                border: '1px solid rgba(255,255,255,0.2)',
+                color: 'white',
+                padding: '8px 12px',
+                borderRadius: 6,
+                cursor: 'pointer',
+                fontSize: 13,
+                fontWeight: 600,
+                transition: 'all 0.2s'
+              }}
+            >
+              ✕ Close
+            </button>
+          </div>
 
-          <div style={{ clear: 'both', marginTop: 40, textAlign: 'center' }}>
-            <div style={{ position: 'relative', display: 'inline-block' }}>
-              {selected.emoji && <span style={{ position: 'absolute', top: -10, right: -10, fontSize: 35 }}>{selected.emoji}</span>}
+          <div style={{ textAlign: 'center' }}>
+            <div style={{ position: 'relative', display: 'inline-block', marginBottom: 15 }}>
+              {selected.emoji && (
+                <span style={{ 
+                  position: 'absolute', 
+                  top: -8, 
+                  right: -8, 
+                  fontSize: isMobile ? 28 : 35,
+                  zIndex: 1
+                }}>
+                  {selected.emoji}
+                </span>
+              )}
               <img
                 src={selected.img || `https://api.dicebear.com/7.x/initials/svg?seed=${selected.name}`}
-                style={{ width: 120, height: 120, borderRadius: '50%', border: '4px solid #3B82F6', boxShadow: '0 0 30px rgba(59, 130, 246, 0.5)' }}
+                style={{ 
+                  width: isMobile ? 100 : 120, 
+                  height: isMobile ? 100 : 120, 
+                  borderRadius: '50%', 
+                  border: '4px solid #3B82F6', 
+                  boxShadow: '0 0 30px rgba(59, 130, 246, 0.5)',
+                  objectFit: 'cover'
+                }}
                 alt={selected.name}
               />
             </div>
 
-            <h2 style={{ margin: '15px 0 5px', fontSize: 28, fontWeight: 'bold' }}>{selected.name}</h2>
-            {selected.vibe && <p style={{ color: '#60A5FA', fontSize: 13, margin: '5px 0', background: 'rgba(59, 130, 246, 0.2)', padding: '6px 15px', borderRadius: 20, display: 'inline-block' }}>{selected.vibe}</p>}
+            <h2 style={{ 
+              margin: '10px 0 5px', 
+              fontSize: isMobile ? 24 : 28, 
+              fontWeight: 'bold',
+              color: 'white'
+            }}>
+              {selected.name}
+            </h2>
+
+            {selected.vibe && (
+              <p style={{ 
+                color: '#60A5FA', 
+                fontSize: 12, 
+                margin: '8px 0', 
+                background: 'rgba(59, 130, 246, 0.2)', 
+                padding: '6px 15px', 
+                borderRadius: 20, 
+                display: 'inline-block',
+                border: '1px solid rgba(59, 130, 246, 0.3)'
+              }}>
+                {selected.vibe}
+              </p>
+            )}
 
             {selected.bio && (
               <div style={{ marginTop: 20, textAlign: 'left' }}>
-                <p style={{ color: '#ccc', fontSize: 14, fontStyle: 'italic', padding: 15, background: 'rgba(255,255,255,0.05)', borderRadius: 10, lineHeight: 1.6 }}>
+                <p style={{ 
+                  color: '#ccc', 
+                  fontSize: 13, 
+                  fontStyle: 'italic', 
+                  padding: 15, 
+                  background: 'rgba(255,255,255,0.05)', 
+                  borderRadius: 10, 
+                  lineHeight: 1.6,
+                  border: '1px solid rgba(255,255,255,0.05)'
+                }}>
                   "{selected.bio}"
                 </p>
               </div>
             )}
 
-            <div style={{ marginTop: 20, textAlign: 'left', display: 'flex', flexDirection: 'column', gap: 10 }}>
+            <div style={{ 
+              marginTop: 20, 
+              textAlign: 'left', 
+              display: 'flex', 
+              flexDirection: 'column', 
+              gap: 8 
+            }}>
               {selected.birthday && (
-                <div style={{ fontSize: 14, color: '#aaa', padding: 10, background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
-                  🎂 {new Date(selected.birthday).toLocaleDateString('en-US', { month: 'long', day: 'numeric', year: 'numeric' })}
+                <div style={{ 
+                  fontSize: 13, 
+                  color: '#aaa', 
+                  padding: 10, 
+                  background: 'rgba(255,255,255,0.03)', 
+                  borderRadius: 8,
+                  border: '1px solid rgba(255,255,255,0.05)'
+                }}>
+                  🎂 {new Date(selected.birthday).toLocaleDateString('en-US', { 
+                    month: 'long', 
+                    day: 'numeric', 
+                    year: 'numeric' 
+                  })}
                 </div>
               )}
               {selected.location && (
-                <div style={{ fontSize: 14, color: '#aaa', padding: 10, background: 'rgba(255,255,255,0.03)', borderRadius: 8 }}>
+                <div style={{ 
+                  fontSize: 13, 
+                  color: '#aaa', 
+                  padding: 10, 
+                  background: 'rgba(255,255,255,0.03)', 
+                  borderRadius: 8,
+                  border: '1px solid rgba(255,255,255,0.05)'
+                }}>
                   📍 {selected.location}
                 </div>
               )}
             </div>
 
             {(selected.instagram || selected.twitter) && (
-              <div style={{ marginTop: 15, display: 'flex', flexDirection: 'column', gap: 10 }}>
+              <div style={{ marginTop: 15, display: 'flex', flexDirection: 'column', gap: 8 }}>
                 {selected.instagram && (
                   <a
                     href={`https://instagram.com/${selected.instagram}`}
@@ -385,7 +595,9 @@ const GraphView = ({ nodes, links, onRefresh }) => {
                       display: 'block',
                       textAlign: 'center',
                       fontWeight: 500,
-                      border: '1px solid rgba(236, 72, 153, 0.3)'
+                      fontSize: 13,
+                      border: '1px solid rgba(236, 72, 153, 0.3)',
+                      transition: 'all 0.2s'
                     }}
                   >
                     📸 @{selected.instagram}
@@ -405,7 +617,9 @@ const GraphView = ({ nodes, links, onRefresh }) => {
                       display: 'block',
                       textAlign: 'center',
                       fontWeight: 500,
-                      border: '1px solid rgba(59, 130, 246, 0.3)'
+                      fontSize: 13,
+                      border: '1px solid rgba(59, 130, 246, 0.3)',
+                      transition: 'all 0.2s'
                     }}
                   >
                     🐦 @{selected.twitter}
@@ -415,11 +629,26 @@ const GraphView = ({ nodes, links, onRefresh }) => {
             )}
 
             <div style={{ marginTop: 25, textAlign: 'left' }}>
-              <h3 style={{ fontSize: 11, color: '#888', textTransform: 'uppercase', letterSpacing: 2, borderBottom: '1px solid rgba(255,255,255,0.1)', paddingBottom: 10, marginBottom: 15 }}>
-                Connections ({links.filter(l => (l.source?.id || l.source) === selected.id || (l.target?.id || l.target) === selected.id).length})
+              <h3 style={{ 
+                fontSize: 11, 
+                color: '#888', 
+                textTransform: 'uppercase', 
+                letterSpacing: 2, 
+                borderBottom: '1px solid rgba(255,255,255,0.1)', 
+                paddingBottom: 10, 
+                marginBottom: 15,
+                fontWeight: 600
+              }}>
+                Connections ({links.filter(l => 
+                  (l.source?.id || l.source) === selected.id || 
+                  (l.target?.id || l.target) === selected.id
+                ).length})
               </h3>
 
-              {links.filter(l => (l.source?.id || l.source) === selected.id || (l.target?.id || l.target) === selected.id).map((link, i) => {
+              {links.filter(l => 
+                (l.source?.id || l.source) === selected.id || 
+                (l.target?.id || l.target) === selected.id
+              ).map((link, i) => {
                 const sId = link.source?.id || link.source;
                 const otherId = sId === selected.id ? (link.target?.id || link.target) : sId;
                 const other = nodes.find(n => n.id === otherId);
@@ -431,30 +660,74 @@ const GraphView = ({ nodes, links, onRefresh }) => {
                       padding: 12,
                       marginBottom: 8,
                       borderRadius: 8,
-                      fontSize: 14,
+                      fontSize: 13,
                       display: 'flex',
                       alignItems: 'center',
                       gap: 12,
                       borderLeft: `4px solid ${relColors[link.type] || '#64748B'}`,
-                      cursor: 'pointer'
+                      cursor: 'pointer',
+                      transition: 'all 0.2s',
+                      border: '1px solid rgba(255,255,255,0.05)'
                     }}
                     onClick={() => setSelected(other)}
+                    onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.1)'}
+                    onMouseLeave={(e) => e.currentTarget.style.background = 'rgba(255,255,255,0.05)'}
                   >
-                    <img src={other?.img || `https://api.dicebear.com/7.x/initials/svg?seed=${other?.name}`} style={{ width: 30, height: 30, borderRadius: '50%' }} alt={other?.name} />
-                    <span style={{ flex: 1, fontWeight: 500 }}>{other?.name || 'Unknown'}</span>
-                    <span style={{ fontSize: 11, color: '#888', background: 'rgba(0,0,0,0.4)', padding: '4px 8px', borderRadius: 4 }}>
+                    <img 
+                      src={other?.img || `https://api.dicebear.com/7.x/initials/svg?seed=${other?.name}`} 
+                      style={{ width: 30, height: 30, borderRadius: '50%', objectFit: 'cover' }} 
+                      alt={other?.name} 
+                    />
+                    <span style={{ flex: 1, fontWeight: 500, color: 'white' }}>
+                      {other?.name || 'Unknown'}
+                    </span>
+                    <span style={{ 
+                      fontSize: 10, 
+                      color: '#888', 
+                      background: 'rgba(0,0,0,0.4)', 
+                      padding: '4px 8px', 
+                      borderRadius: 4,
+                      textTransform: 'capitalize'
+                    }}>
                       {link.type?.replace('_', ' ')}
                     </span>
                   </div>
                 );
               })}
 
-              {links.filter(l => (l.source?.id || l.source) === selected.id || (l.target?.id || l.target) === selected.id).length === 0 && (
-                <p style={{ color: '#666', textAlign: 'center', padding: 20, fontSize: 14, fontStyle: 'italic' }}>No connections yet</p>
+              {links.filter(l => 
+                (l.source?.id || l.source) === selected.id || 
+                (l.target?.id || l.target) === selected.id
+              ).length === 0 && (
+                <p style={{ 
+                  color: '#666', 
+                  textAlign: 'center', 
+                  padding: 20, 
+                  fontSize: 13, 
+                  fontStyle: 'italic' 
+                }}>
+                  No connections yet
+                </p>
               )}
             </div>
           </div>
         </div>
+      )}
+
+      {/* Mobile overlay when sidebar is open */}
+      {isMobile && isSidebarOpen && (
+        <div
+          onClick={() => setIsSidebarOpen(false)}
+          style={{
+            position: 'fixed',
+            top: 0,
+            left: 0,
+            right: 0,
+            bottom: 0,
+            background: 'rgba(0,0,0,0.5)',
+            zIndex: 54
+          }}
+        />
       )}
     </div>
   );
