@@ -1,10 +1,58 @@
+import { useState, useEffect } from 'react';
 import { HashRouter, Routes, Route, Link } from 'react-router-dom';
 import GraphView from './pages/GraphView';
 import AdminPanel from './pages/AdminPanel';
-// ... existing imports
+import StatsPanel from './pages/StatsPanel';
+import { supabase } from './supabase';
+import { Network as NetworkIcon, Settings, Loader2, BarChart3 } from 'lucide-react';
+import { generateImplicitLinks } from './utils/graphUtils';
 
 function App() {
-  // ... existing code ...
+  const [nodes, setNodes] = useState([]);
+  const [links, setLinks] = useState([]);
+  const [loading, setLoading] = useState(true);
+
+  // Fetch data from Supabase on load
+  const fetchData = async () => {
+    try {
+      const { data: profiles, error: profileError } = await supabase.from('profiles').select('*');
+      if (profileError) throw profileError;
+
+      const { data: rels, error: relError } = await supabase.from('relationships').select('*');
+      if (relError) throw relError;
+
+      if (profiles) setNodes(profiles);
+      if (rels) setLinks(rels);
+    } catch (error) {
+      console.error("Error fetching data:", error);
+      alert("Error loading data: " + error.message);
+    } finally {
+      setLoading(false);
+    }
+  };
+
+  useEffect(() => {
+    fetchData();
+
+    // Realtime subscription (Auto-update when someone adds/removes)
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on('postgres_changes', { event: '*', schema: 'public' }, () => fetchData())
+      .subscribe();
+
+    return () => supabase.removeChannel(channel);
+  }, []);
+
+  if (loading) {
+    return (
+      <div className="min-h-screen bg-[#050505] flex items-center justify-center">
+        <div className="flex flex-col items-center gap-4">
+          <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+          <p className="text-white/50 text-sm">Loading your network...</p>
+        </div>
+      </div>
+    );
+  }
 
   return (
     <HashRouter>
