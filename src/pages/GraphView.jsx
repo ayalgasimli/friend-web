@@ -293,16 +293,7 @@ const GraphView = ({ nodes, links, onRefresh }) => {
 
       {/* RIGHT SIDEBAR - PROFILE */}
       {selected && (
-        <div style={{
-          width: 350,
-          background: 'rgba(0,0,0,0.95)',
-          borderLeft: '1px solid rgba(255,255,255,0.1)',
-          padding: 20,
-          paddingTop: 80,
-          color: 'white',
-          overflowY: 'auto',
-          zIndex: 10
-        }}>
+        <div className="fixed bottom-0 left-0 w-full md:top-0 md:right-0 md:left-auto md:w-[350px] md:h-screen bg-[#0a0a0a]/95 backdrop-blur-xl border-t md:border-t-0 md:border-l border-white/10 p-6 z-50 transition-all duration-300 shadow-2xl rounded-t-3xl md:rounded-none md:rounded-l-3xl max-h-[80vh] md:max-h-screen overflow-y-auto pt-16 md:pt-6">
           <button
             onClick={() => setSelected(null)}
             style={{
