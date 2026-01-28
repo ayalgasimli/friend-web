@@ -2,6 +2,7 @@
   "name": "friend-web",
   "private": true,
   "version": "0.0.0",
+  "homepage": "https://ayalgasimli.github.io/friend-web",
   "type": "module",
   "scripts": {
     "dev": "vite",
