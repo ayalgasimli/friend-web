@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect, useMemo } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { supabase } from '../supabase';
-import { Trash2, Menu, X, Sparkles, ZoomIn, ZoomOut, Maximize2, RotateCcw } from 'lucide-react';
+import { Trash2, Menu, X } from 'lucide-react';
 
 const GraphView = ({ nodes, links, onRefresh, session }) => {
   const [selected, setSelected] = useState(null);
@@ -12,7 +12,6 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
     height: window.innerHeight
   });
   const [sidebarPeople, setSidebarPeople] = useState([]);
-  const [dragMode, setDragMode] = useState('pan'); // 'pan' or 'node'
   const graphRef = useRef();
   const imageCache = useRef({});
   const isMobile = windowSize.width < 768;
@@ -44,14 +43,45 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
 
   // Preload images
   useEffect(() => {
-    nodes.forEach(node => {
-      const imgSrc = node.img || `https://api.dicebear.com/7.x/initials/svg?seed=${node.name}`;
-      if (!imageCache.current[imgSrc]) {
+    const loadImage = (src) => {
+      return new Promise((resolve, reject) => {
+        if (imageCache.current[src]) {
+          resolve(imageCache.current[src]);
+          return;
+        }
         const img = new Image();
-        img.src = imgSrc;
-        imageCache.current[imgSrc] = img;
+        img.crossOrigin = 'anonymous';
+        img.onload = () => {
+          imageCache.current[src] = img;
+          resolve(img);
+        };
+        img.onerror = () => {
+          // Still cache even on error so we don't keep trying
+          imageCache.current[src] = img;
+          resolve(img);
+        };
+        img.src = src;
+      });
+    };
+
+    const loadAllImages = async () => {
+      const promises = nodes.map(node => {
+        const imgSrc = node.img || `https://api.dicebear.com/7.x/initials/svg?seed=${node.name}`;
+        return loadImage(imgSrc);
+      });
+
+      try {
+        await Promise.all(promises);
+        // Force a re-render after images are loaded
+        if (graphRef.current) {
+          graphRef.current.refresh();
+        }
+      } catch (error) {
+        console.error('Error loading images:', error);
       }
-    });
+    };
+
+    loadAllImages();
   }, [nodes]);
 
   // Update sidebar people with stagger animation
@@ -173,137 +203,6 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
       >
         {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
-
-      {/* ZOOM & MODE CONTROLS */}
-      <div
-        style={{
-          position: 'fixed',
-          bottom: isMobile ? 100 : 20,
-          right: 20,
-          zIndex: 100,
-          display: 'flex',
-          flexDirection: 'column',
-          gap: 8
-        }}
-      >
-        {/* Mode Toggle */}
-        <button
-          onClick={() => setDragMode(dragMode === 'pan' ? 'node' : 'pan')}
-          style={{
-            background: dragMode === 'pan' ? 'rgba(59, 130, 246, 0.8)' : 'rgba(0,0,0,0.8)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            color: 'white',
-            padding: '10px 12px',
-            borderRadius: 8,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            fontSize: '11px',
-            fontWeight: 'bold',
-            textTransform: 'uppercase',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-          title={dragMode === 'pan' ? 'Click to drag nodes' : 'Click to pan view'}
-        >
-          {dragMode === 'pan' ? '🖐️ Pan' : '🎯 Move'}
-        </button>
-
-        <button
-          onClick={() => {
-            if (graphRef.current) {
-              graphRef.current.zoom(1.3);
-            }
-          }}
-          style={{
-            background: 'rgba(0,0,0,0.8)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            color: 'white',
-            padding: 10,
-            borderRadius: 8,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-          title="Zoom in"
-        >
-          <ZoomIn size={20} />
-        </button>
-        <button
-          onClick={() => {
-            if (graphRef.current) {
-              graphRef.current.zoom(0.7);
-            }
-          }}
-          style={{
-            background: 'rgba(0,0,0,0.8)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            color: 'white',
-            padding: 10,
-            borderRadius: 8,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-          title="Zoom out"
-        >
-          <ZoomOut size={20} />
-        </button>
-        <button
-          onClick={() => {
-            if (graphRef.current) {
-              graphRef.current.zoomToFit(1);
-            }
-          }}
-          style={{
-            background: 'rgba(0,0,0,0.8)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            color: 'white',
-            padding: 10,
-            borderRadius: 8,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-          title="Fit to screen"
-        >
-          <Maximize2 size={20} />
-        </button>
-        <button
-          onClick={() => {
-            if (graphRef.current) {
-              graphRef.current.zoom(1);
-              graphRef.current.centerAt();
-            }
-          }}
-          style={{
-            background: 'rgba(0,0,0,0.8)',
-            border: '1px solid rgba(255,255,255,0.2)',
-            color: 'white',
-            padding: 10,
-            borderRadius: 8,
-            cursor: 'pointer',
-            display: 'flex',
-            alignItems: 'center',
-            justifyContent: 'center',
-            touchAction: 'manipulation',
-            WebkitTapHighlightColor: 'transparent',
-          }}
-          title="Reset view"
-        >
-          <RotateCcw size={20} />
-        </button>
-      </div>
 
       {/* LEFT SIDEBAR - PEOPLE LIST */}
       <div style={{
@@ -468,8 +367,7 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
         width: graphWidth,
         height: graphHeight,
         background: 'radial-gradient(circle at center, #0a0a1a 0%, #050505 100%)',
-        touchAction: isMobile ? 'none' : 'auto',
-        WebkitOverflowScrolling: 'touch'
+        zIndex: 10
       }}>
         {graphData && graphData.nodes && graphData.nodes.length > 0 ? (
           <ForceGraph2D
@@ -479,61 +377,64 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
             graphData={graphData}
             nodeLabel="name"
             nodeAutoColorBy="id"
-            nodeRelSize={14}
+            nodeRelSize={15}
             nodeCanvasObjectMode={() => 'replace'}
             nodeCanvasObject={(node, ctx, globalScale) => {
-              const size = 14;
+              const size = 15;
               const isSelected = selected?.id === node.id;
 
-              if (isSelected) {
-                ctx.shadowColor = '#60A5FA';
-                ctx.shadowBlur = 25;
-              } else {
-                ctx.shadowColor = 'transparent';
-                ctx.shadowBlur = 0;
-              }
+              try {
+                if (isSelected) {
+                  ctx.shadowColor = '#60A5FA';
+                  ctx.shadowBlur = 20;
+                } else {
+                  ctx.shadowColor = 'transparent';
+                  ctx.shadowBlur = 0;
+                }
 
-              ctx.beginPath();
-              ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-              ctx.fillStyle = isSelected ? '#1e293b' : '#0f172a';
-              ctx.fill();
-
-              ctx.shadowBlur = 0;
-
-              const imgSrc = node.img || `https://api.dicebear.com/7.x/initials/svg?seed=${node.name}`;
-              const img = imageCache.current[imgSrc];
-              if (img && img.complete && img.naturalHeight !== 0) {
-                ctx.save();
                 ctx.beginPath();
                 ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-                ctx.clip();
-                ctx.drawImage(img, node.x - size, node.y - size, size * 2, size * 2);
-                ctx.restore();
+                ctx.fillStyle = isSelected ? '#1e293b' : '#0f172a';
+                ctx.fill();
+
+                ctx.shadowBlur = 0;
+
+                // Draw image
+                const imgSrc = node.img || `https://api.dicebear.com/7.x/initials/svg?seed=${node.name}`;
+                const img = imageCache.current[imgSrc];
+
+                if (img) {
+                  ctx.save();
+                  ctx.beginPath();
+                  ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
+                  ctx.clip();
+                  try {
+                    ctx.drawImage(img, node.x - size, node.y - size, size * 2, size * 2);
+                  } catch (e) {
+                    // Image draw failed, show colored circle
+                  }
+                  ctx.restore();
+                }
+
+                // Draw border
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
+                ctx.lineWidth = (isSelected ? 3 : 2) / globalScale;
+                ctx.strokeStyle = isSelected ? '#60A5FA' : 'rgba(255,255,255,0.3)';
+                ctx.stroke();
+
+                // Draw label
+                const label = node.name;
+                const fontSize = 14 / globalScale;
+                ctx.font = `600 ${fontSize}px "Inter", sans-serif`;
+
+                ctx.textAlign = 'center';
+                ctx.textBaseline = 'middle';
+                ctx.fillStyle = isSelected ? '#60A5FA' : 'white';
+                ctx.fillText(label, node.x, node.y + size + fontSize);
+              } catch (e) {
+                console.error('Canvas rendering error:', e);
               }
-
-              ctx.beginPath();
-              ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-              ctx.lineWidth = (isSelected ? 3 : 1.5) / globalScale;
-              ctx.strokeStyle = isSelected ? '#60A5FA' : 'rgba(255,255,255,0.2)';
-              ctx.stroke();
-
-              const label = node.name;
-              const fontSize = 14 / globalScale;
-              ctx.font = `600 ${fontSize}px "Inter", -apple-system, BlinkMacSystemFont, sans-serif`;
-
-              ctx.textAlign = 'center';
-              ctx.textBaseline = 'middle';
-
-              ctx.shadowColor = 'black';
-              ctx.shadowBlur = 4;
-              ctx.lineWidth = 3 / globalScale;
-              ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-              ctx.strokeText(label, node.x, node.y + size + fontSize);
-
-              ctx.fillStyle = isSelected ? '#60A5FA' : 'white';
-              ctx.fillText(label, node.x, node.y + size + fontSize);
-
-              ctx.shadowBlur = 0;
             }}
             linkColor={link => {
               const hexToRgba = (hex, alpha) => {
@@ -560,20 +461,13 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
               return null;
             }}
             backgroundColor="rgba(0,0,0,0)"
-            cooldownTicks={100}
-            enableNodeDrag={dragMode === 'node'}
+            cooldownTicks={0}
+            enableNodeDrag={true}
             enableZoomInteraction={true}
             enablePanInteraction={true}
             minZoom={0.1}
             maxZoom={5}
-            dagMode={null}
-            onNodeDragEnd={() => {
-              if (graphRef.current) {
-                graphRef.current.d3ReheatSimulation();
-              }
-            }}
             onNodeClick={(node) => {
-              console.log('Node clicked:', node.name);
               setSelected(node);
               if (isMobile) setIsSidebarOpen(false);
             }}
@@ -615,7 +509,7 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
             borderTop: isMobile ? '1px solid rgba(255,255,255,0.1)' : 'none',
             borderLeft: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)',
             padding: isMobile ? '20px 20px 30px' : 24,
-            zIndex: 50,
+            zIndex: 1000,
             overflowY: 'auto',
             borderRadius: isMobile ? '24px 24px 0 0' : 0,
             boxShadow: isMobile ? '0 -4px 20px rgba(0,0,0,0.5)' : 'none',
