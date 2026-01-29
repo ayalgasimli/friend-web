@@ -1,7 +1,7 @@
-import React, { useState, useRef, useEffect } from 'react';
+import React, { useState, useRef, useEffect, useMemo } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { supabase } from '../supabase';
-import { Trash2, Menu, X, Sparkles } from 'lucide-react';
+import { Trash2, Menu, X, Sparkles, ZoomIn, ZoomOut, Maximize2, RotateCcw } from 'lucide-react';
 
 const GraphView = ({ nodes, links, onRefresh, session }) => {
   const [selected, setSelected] = useState(null);
@@ -11,10 +11,11 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
     width: window.innerWidth,
     height: window.innerHeight
   });
-  const [hoveredNode, setHoveredNode] = useState(null);
   const [sidebarPeople, setSidebarPeople] = useState([]);
+  const [dragMode, setDragMode] = useState('pan'); // 'pan' or 'node'
   const graphRef = useRef();
   const imageCache = useRef({});
+  const isMobile = windowSize.width < 768;
 
   // Handle window resize
   useEffect(() => {
@@ -115,11 +116,30 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
   };
 
   // Calculate graph dimensions
-  const isMobile = windowSize.width < 768;
   const leftSidebarWidth = isMobile ? 0 : (isSidebarOpen ? 250 : 0);
   const rightSidebarWidth = isMobile ? 0 : (selected ? 350 : 0);
   const graphWidth = windowSize.width - leftSidebarWidth - rightSidebarWidth;
   const graphHeight = windowSize.height;
+
+  // Memoize graph data to prevent recalculation on mobile
+  const graphData = useMemo(() => {
+    const count = nodes.length;
+    const minDim = Math.min(windowSize.width, windowSize.height);
+    const layoutRadius = Math.max(120, minDim * 0.3);
+
+    return {
+      nodes: nodes.map((node, i) => {
+        const angle = (i / count) * 2 * Math.PI;
+        return {
+          ...node,
+          x: layoutRadius * Math.cos(angle),
+          y: layoutRadius * Math.sin(angle),
+          val: isMobile ? 10 : 14
+        };
+      }),
+      links: links.map(link => ({ ...link }))
+    };
+  }, [nodes, links, windowSize.width, windowSize.height]);
 
   return (
     <div style={{
@@ -153,6 +173,137 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
       >
         {isSidebarOpen ? <X size={20} /> : <Menu size={20} />}
       </button>
+
+      {/* ZOOM & MODE CONTROLS */}
+      <div
+        style={{
+          position: 'fixed',
+          bottom: isMobile ? 100 : 20,
+          right: 20,
+          zIndex: 100,
+          display: 'flex',
+          flexDirection: 'column',
+          gap: 8
+        }}
+      >
+        {/* Mode Toggle */}
+        <button
+          onClick={() => setDragMode(dragMode === 'pan' ? 'node' : 'pan')}
+          style={{
+            background: dragMode === 'pan' ? 'rgba(59, 130, 246, 0.8)' : 'rgba(0,0,0,0.8)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            color: 'white',
+            padding: '10px 12px',
+            borderRadius: 8,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            fontSize: '11px',
+            fontWeight: 'bold',
+            textTransform: 'uppercase',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+          title={dragMode === 'pan' ? 'Click to drag nodes' : 'Click to pan view'}
+        >
+          {dragMode === 'pan' ? '🖐️ Pan' : '🎯 Move'}
+        </button>
+
+        <button
+          onClick={() => {
+            if (graphRef.current) {
+              graphRef.current.zoom(1.3);
+            }
+          }}
+          style={{
+            background: 'rgba(0,0,0,0.8)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            color: 'white',
+            padding: 10,
+            borderRadius: 8,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+          title="Zoom in"
+        >
+          <ZoomIn size={20} />
+        </button>
+        <button
+          onClick={() => {
+            if (graphRef.current) {
+              graphRef.current.zoom(0.7);
+            }
+          }}
+          style={{
+            background: 'rgba(0,0,0,0.8)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            color: 'white',
+            padding: 10,
+            borderRadius: 8,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+          title="Zoom out"
+        >
+          <ZoomOut size={20} />
+        </button>
+        <button
+          onClick={() => {
+            if (graphRef.current) {
+              graphRef.current.zoomToFit(1);
+            }
+          }}
+          style={{
+            background: 'rgba(0,0,0,0.8)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            color: 'white',
+            padding: 10,
+            borderRadius: 8,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+          title="Fit to screen"
+        >
+          <Maximize2 size={20} />
+        </button>
+        <button
+          onClick={() => {
+            if (graphRef.current) {
+              graphRef.current.zoom(1);
+              graphRef.current.centerAt();
+            }
+          }}
+          style={{
+            background: 'rgba(0,0,0,0.8)',
+            border: '1px solid rgba(255,255,255,0.2)',
+            color: 'white',
+            padding: 10,
+            borderRadius: 8,
+            cursor: 'pointer',
+            display: 'flex',
+            alignItems: 'center',
+            justifyContent: 'center',
+            touchAction: 'manipulation',
+            WebkitTapHighlightColor: 'transparent',
+          }}
+          title="Reset view"
+        >
+          <RotateCcw size={20} />
+        </button>
+      </div>
 
       {/* LEFT SIDEBAR - PEOPLE LIST */}
       <div style={{
@@ -221,14 +372,14 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
               opacity: 0,
               animationFillMode: 'forwards'
             }}
-            onMouseEnter={(e) => {
+            onMouseEnter={!isMobile ? (e) => {
               e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
               e.currentTarget.style.transform = 'translateX(5px)';
-            }}
-            onMouseLeave={(e) => {
+            } : undefined}
+            onMouseLeave={!isMobile ? (e) => {
               e.currentTarget.style.background = selected?.id === node.id ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255,255,255,0.05)';
               e.currentTarget.style.transform = 'translateX(0)';
-            }}
+            } : undefined}
           >
             <div style={{ position: 'relative' }}>
               <img
@@ -236,15 +387,6 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
                 style={{ width: 35, height: 35, borderRadius: '50%', objectFit: 'cover' }}
                 alt={node.name}
               />
-              {hoveredNode?.id === node.id && (
-                <div style={{
-                  position: 'absolute',
-                  inset: -3,
-                  borderRadius: '50%',
-                  border: '2px solid #3B82F6',
-                  animation: 'pulse-glow 1s infinite'
-                }} />
-              )}
             </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
@@ -325,144 +467,134 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
         position: 'relative',
         width: graphWidth,
         height: graphHeight,
-        background: 'radial-gradient(circle at center, #0a0a1a 0%, #050505 100%)'
+        background: 'radial-gradient(circle at center, #0a0a1a 0%, #050505 100%)',
+        touchAction: isMobile ? 'none' : 'auto',
+        WebkitOverflowScrolling: 'touch'
       }}>
-        <ForceGraph2D
-          ref={graphRef}
-          width={graphWidth}
-          height={graphHeight}
-          graphData={{
-            nodes: nodes.map((node, i) => {
-              const count = nodes.length;
-              const minDim = Math.min(graphWidth, graphHeight);
-              const layoutRadius = Math.max(120, minDim * 0.3);
-              const angle = (i / count) * 2 * Math.PI;
+        {graphData && graphData.nodes && graphData.nodes.length > 0 ? (
+          <ForceGraph2D
+            ref={graphRef}
+            width={graphWidth}
+            height={graphHeight}
+            graphData={graphData}
+            nodeLabel="name"
+            nodeAutoColorBy="id"
+            nodeRelSize={14}
+            nodeCanvasObjectMode={() => 'replace'}
+            nodeCanvasObject={(node, ctx, globalScale) => {
+              const size = 14;
+              const isSelected = selected?.id === node.id;
 
-              return {
-                ...node,
-                x: layoutRadius * Math.cos(angle),
-                y: layoutRadius * Math.sin(angle),
-                val: isMobile ? 10 : 14
-              };
-            }),
-            links: links.map(link => ({ ...link }))
-          }}
-          nodeLabel="name"
-          nodeAutoColorBy="id"
-          nodeRelSize={isMobile ? 10 : 14}
-          nodeCanvasObjectMode={() => 'replace'}
-          nodeCanvasObject={(node, ctx, globalScale) => {
-            const size = isMobile ? 10 : 14;
-            const isSelected = selected?.id === node.id;
-            const isHovered = hoveredNode?.id === node.id;
+              if (isSelected) {
+                ctx.shadowColor = '#60A5FA';
+                ctx.shadowBlur = 25;
+              } else {
+                ctx.shadowColor = 'transparent';
+                ctx.shadowBlur = 0;
+              }
 
-            // Add glow effect for selected or hovered nodes
-            if (isSelected || isHovered) {
-              ctx.shadowColor = isSelected ? '#60A5FA' : '#3B82F6';
-              ctx.shadowBlur = isSelected ? 25 : 15;
-            } else {
-              ctx.shadowColor = 'transparent';
-              ctx.shadowBlur = 0;
-            }
-
-            // Draw outer ring for hovered nodes
-            if (isHovered && !isSelected) {
-              ctx.beginPath();
-              ctx.arc(node.x, node.y, size + 3, 0, 2 * Math.PI, false);
-              ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
-              ctx.lineWidth = 2 / globalScale;
-              ctx.stroke();
-            }
-
-            ctx.beginPath();
-            ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-            ctx.fillStyle = isSelected ? '#1e293b' : '#0f172a';
-            ctx.fill();
-
-            ctx.shadowBlur = 0;
-
-            const imgSrc = node.img || `https://api.dicebear.com/7.x/initials/svg?seed=${node.name}`;
-            const img = imageCache.current[imgSrc];
-            if (img && img.complete && img.naturalHeight !== 0) {
-              ctx.save();
               ctx.beginPath();
               ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-              ctx.clip();
-              ctx.drawImage(img, node.x - size, node.y - size, size * 2, size * 2);
-              ctx.restore();
-            }
+              ctx.fillStyle = isSelected ? '#1e293b' : '#0f172a';
+              ctx.fill();
 
-            ctx.beginPath();
-            ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-            ctx.lineWidth = (isHovered ? 2.5 : isSelected ? 3 : 1.5) / globalScale;
-            ctx.strokeStyle = isSelected ? '#60A5FA' : (isHovered ? '#3B82F6' : 'rgba(255,255,255,0.2)');
-            ctx.stroke();
+              ctx.shadowBlur = 0;
 
-            const label = node.name;
-            const fontSize = (isMobile ? 12 : 14) / globalScale;
-            ctx.font = `600 ${fontSize}px "Inter", -apple-system, BlinkMacSystemFont, sans-serif`;
+              const imgSrc = node.img || `https://api.dicebear.com/7.x/initials/svg?seed=${node.name}`;
+              const img = imageCache.current[imgSrc];
+              if (img && img.complete && img.naturalHeight !== 0) {
+                ctx.save();
+                ctx.beginPath();
+                ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
+                ctx.clip();
+                ctx.drawImage(img, node.x - size, node.y - size, size * 2, size * 2);
+                ctx.restore();
+              }
 
-            ctx.textAlign = 'center';
-            ctx.textBaseline = 'middle';
+              ctx.beginPath();
+              ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
+              ctx.lineWidth = (isSelected ? 3 : 1.5) / globalScale;
+              ctx.strokeStyle = isSelected ? '#60A5FA' : 'rgba(255,255,255,0.2)';
+              ctx.stroke();
 
-            ctx.shadowColor = 'black';
-            ctx.shadowBlur = 4;
-            ctx.lineWidth = 3 / globalScale;
-            ctx.strokeStyle = 'rgba(0,0,0,0.8)';
-            ctx.strokeText(label, node.x, node.y + size + fontSize);
+              const label = node.name;
+              const fontSize = 14 / globalScale;
+              ctx.font = `600 ${fontSize}px "Inter", -apple-system, BlinkMacSystemFont, sans-serif`;
 
-            ctx.fillStyle = (isSelected || isHovered) ? '#60A5FA' : 'white';
-            ctx.fillText(label, node.x, node.y + size + fontSize);
+              ctx.textAlign = 'center';
+              ctx.textBaseline = 'middle';
 
-            ctx.shadowBlur = 0;
-          }}
-          linkColor={link => {
-            const hexToRgba = (hex, alpha) => {
-              const r = parseInt(hex.slice(1, 3), 16);
-              const g = parseInt(hex.slice(3, 5), 16);
-              const b = parseInt(hex.slice(5, 7), 16);
-              return `rgba(${r}, ${g}, ${b}, ${alpha})`;
-            };
+              ctx.shadowColor = 'black';
+              ctx.shadowBlur = 4;
+              ctx.lineWidth = 3 / globalScale;
+              ctx.strokeStyle = 'rgba(0,0,0,0.8)';
+              ctx.strokeText(label, node.x, node.y + size + fontSize);
 
-            if (link.category === 2) return 'rgba(147, 51, 234, 0.85)';
-            if (link.category === 3) return 'rgba(234, 179, 8, 0.65)';
+              ctx.fillStyle = isSelected ? '#60A5FA' : 'white';
+              ctx.fillText(label, node.x, node.y + size + fontSize);
 
-            const color = relColors[link.type] || '#64748B';
-            return hexToRgba(color, 0.6);
-          }}
-          linkWidth={link => {
-            if (link.category === 1) return isMobile ? 1.5 : 2;
-            if (link.category === 2) return isMobile ? 1 : 1.5;
-            return isMobile ? 0.8 : 1;
-          }}
-          linkLineDash={link => {
-            if (link.category === 2) return [8, 3];
-            if (link.category === 3) return [4, 4];
-            return null;
-          }}
-          backgroundColor="rgba(0,0,0,0)"
-          cooldownTicks={100}
-          enableNodeDrag={true}
-          enableZoomInteraction={true}
-          enablePanInteraction={true}
-          onNodeClick={(node) => {
-            console.log('Node clicked:', node.name);
-            setSelected(node);
-            if (isMobile) setIsSidebarOpen(false);
-          }}
-          onNodeHover={(node) => {
-            setHoveredNode(node);
-            // Change cursor to pointer when hovering over a node
-            const canvas = graphRef.current?.querySelector('canvas');
-            if (canvas) {
-              canvas.style.cursor = node ? 'pointer' : 'grab';
-            }
-          }}
-          onNodeRightClick={() => false}
-          onBackgroundClick={() => {
-            setSelected(null);
-          }}
-        />
+              ctx.shadowBlur = 0;
+            }}
+            linkColor={link => {
+              const hexToRgba = (hex, alpha) => {
+                const r = parseInt(hex.slice(1, 3), 16);
+                const g = parseInt(hex.slice(3, 5), 16);
+                const b = parseInt(hex.slice(5, 7), 16);
+                return `rgba(${r}, ${g}, ${b}, ${alpha})`;
+              };
+
+              if (link.category === 2) return 'rgba(147, 51, 234, 0.85)';
+              if (link.category === 3) return 'rgba(234, 179, 8, 0.65)';
+
+              const color = relColors[link.type] || '#64748B';
+              return hexToRgba(color, 0.6);
+            }}
+            linkWidth={link => {
+              if (link.category === 1) return 2;
+              if (link.category === 2) return 1.5;
+              return 1;
+            }}
+            linkLineDash={link => {
+              if (link.category === 2) return [8, 3];
+              if (link.category === 3) return [4, 4];
+              return null;
+            }}
+            backgroundColor="rgba(0,0,0,0)"
+            cooldownTicks={100}
+            enableNodeDrag={dragMode === 'node'}
+            enableZoomInteraction={true}
+            enablePanInteraction={true}
+            minZoom={0.1}
+            maxZoom={5}
+            dagMode={null}
+            onNodeDragEnd={() => {
+              if (graphRef.current) {
+                graphRef.current.d3ReheatSimulation();
+              }
+            }}
+            onNodeClick={(node) => {
+              console.log('Node clicked:', node.name);
+              setSelected(node);
+              if (isMobile) setIsSidebarOpen(false);
+            }}
+            onNodeRightClick={() => false}
+            onBackgroundClick={() => {
+              setSelected(null);
+            }}
+          />
+        ) : (
+          <div style={{
+            display: 'flex',
+            flexDirection: 'column',
+            alignItems: 'center',
+            justifyContent: 'center',
+            height: '100%',
+            color: '#666'
+          }}>
+            <p style={{ fontSize: '18px', marginBottom: '10px' }}>No people in the network yet</p>
+            <p style={{ fontSize: '14px' }}>Add people using the Admin panel</p>
+          </div>
+        )}
       </div>
 
       {/* RIGHT SIDEBAR - PROFILE */}
