@@ -1,5 +1,5 @@
 import { useState, useEffect } from 'react';
-import { HashRouter, Routes, Route, Link, Navigate } from 'react-router-dom';
+import { HashRouter, Routes, Route, Link, Navigate, useLocation } from 'react-router-dom';
 import GraphView from './pages/GraphView';
 import AdminPanel from './pages/AdminPanel';
 import StatsPanel from './pages/StatsPanel';
@@ -8,11 +8,38 @@ import { supabase } from './supabase';
 import { Network as NetworkIcon, Settings, Loader2, BarChart3, LogOut } from 'lucide-react';
 import { generateImplicitLinks } from './utils/graphUtils';
 
-function App() {
+// Navigation Item Component with enhanced effects
+const NavItem = ({ to, icon: Icon, label, isActive }) => {
+  return (
+    <Link
+      to={to}
+      className={`relative flex items-center gap-2 text-sm font-medium px-4 py-2 rounded-full backdrop-blur-xl border transition-all duration-300 group ${
+        isActive
+          ? 'bg-gradient-to-r from-blue-600 to-purple-600 text-white border-white/20 shadow-neon-blue'
+          : 'text-white/60 bg-black/30 border-white/10 hover:text-white hover:bg-black/50 hover:border-white/20'
+      }`}
+    >
+      <Icon size={16} className={`transition-transform duration-300 ${isActive ? 'scale-110' : 'group-hover:scale-110 group-hover:rotate-12'}`} />
+      <span className={`hidden sm:inline transition-all ${isActive ? 'font-bold' : ''}`}>{label}</span>
+
+      {/* Active indicator */}
+      {isActive && (
+        <span className="absolute inset-0 rounded-full bg-gradient-to-r from-blue-600 to-purple-600 opacity-0 group-hover:opacity-20 blur-xl transition-opacity" />
+      )}
+
+      {/* Hover glow effect */}
+      <span className="absolute inset-0 rounded-full bg-blue-500/0 group-hover:bg-blue-500/10 transition-colors" />
+    </Link>
+  );
+};
+
+// App wrapper to handle location
+function AppContent() {
   const [nodes, setNodes] = useState([]);
   const [links, setLinks] = useState([]);
   const [loading, setLoading] = useState(true);
   const [session, setSession] = useState(null);
+  const location = useLocation();
 
   // Fetch data from Supabase on load
   const fetchData = async () => {
@@ -65,8 +92,11 @@ function App() {
     return (
       <div className="min-h-screen bg-[#050505] flex items-center justify-center">
         <div className="flex flex-col items-center gap-4">
-          <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
-          <p className="text-white/50 text-sm">Loading your network...</p>
+          <div className="relative">
+            <Loader2 className="w-12 h-12 text-blue-500 animate-spin" />
+            <div className="absolute inset-0 w-12 h-12 border-4 border-purple-500/30 rounded-full animate-ping" />
+          </div>
+          <p className="text-white/50 text-sm animate-pulse">Loading your network...</p>
         </div>
       </div>
     );
@@ -77,31 +107,23 @@ function App() {
   };
 
   return (
-    <HashRouter>
-      <nav className="fixed top-0 right-0 z-50 p-4 flex gap-2">
-        <Link to="/" className="flex items-center gap-2 text-white/60 hover:text-white text-sm font-medium bg-black/30 px-4 py-2 rounded-full backdrop-blur-xl border border-white/10 hover:bg-black/50 hover:border-white/20 transition-all">
-          <NetworkIcon size={16} />
-          <span className="hidden sm:inline">Graph</span>
-        </Link>
-        <Link to="/stats" className="flex items-center gap-2 text-white/60 hover:text-white text-sm font-medium bg-black/30 px-4 py-2 rounded-full backdrop-blur-xl border border-white/10 hover:bg-black/50 hover:border-white/20 transition-all">
-          <BarChart3 size={16} />
-          <span className="hidden sm:inline">Stats</span>
-        </Link>
+    <>
+      <nav className="fixed top-0 right-0 z-50 p-4 flex gap-2 animate-slide-up">
+        <NavItem to="/" icon={NetworkIcon} label="Graph" isActive={location.pathname === '/'} />
+        <NavItem to="/stats" icon={BarChart3} label="Stats" isActive={location.pathname === '/stats'} />
 
         {session ? (
           <>
-            <Link to="/admin" className="flex items-center gap-2 text-white/60 hover:text-white text-sm font-medium bg-black/30 px-4 py-2 rounded-full backdrop-blur-xl border border-white/10 hover:bg-black/50 hover:border-white/20 transition-all">
-              <Settings size={16} />
-              <span className="hidden sm:inline">Admin</span>
-            </Link>
-            <button onClick={handleLogout} className="flex items-center gap-2 text-red-400/80 hover:text-red-400 text-sm font-medium bg-black/30 px-3 py-2 rounded-full backdrop-blur-xl border border-white/10 hover:bg-black/50 hover:border-white/20 transition-all">
-              <LogOut size={16} />
+            <NavItem to="/admin" icon={Settings} label="Admin" isActive={location.pathname === '/admin'} />
+            <button
+              onClick={handleLogout}
+              className="relative flex items-center gap-2 text-red-400/80 hover:text-red-400 text-sm font-medium bg-black/30 px-3 py-2 rounded-full backdrop-blur-xl border border-white/10 hover:bg-red-500/10 hover:border-red-500/30 transition-all duration-300 group"
+            >
+              <LogOut size={16} className="transition-transform group-hover:-translate-x-1" />
             </button>
           </>
         ) : (
-          <Link to="/login" className="flex items-center gap-2 text-white/60 hover:text-white text-sm font-medium bg-black/30 px-4 py-2 rounded-full backdrop-blur-xl border border-white/10 hover:bg-black/50 hover:border-white/20 transition-all">
-            <span className="">Login</span>
-          </Link>
+          <NavItem to="/login" icon={() => <span className="text-xs">🔐</span>} label="Login" isActive={location.pathname === '/login'} />
         )}
       </nav>
       <Routes>
@@ -110,6 +132,14 @@ function App() {
         <Route path="/login" element={!session ? <Login /> : <Navigate to="/admin" />} />
         <Route path="/admin" element={session ? <AdminPanel nodes={nodes} links={links} refreshData={fetchData} /> : <Navigate to="/login" />} />
       </Routes>
+    </>
+  );
+}
+
+function App() {
+  return (
+    <HashRouter>
+      <AppContent />
     </HashRouter>
   );
 }

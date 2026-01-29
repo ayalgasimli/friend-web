@@ -1,7 +1,7 @@
 import React, { useState, useRef, useEffect } from 'react';
 import ForceGraph2D from 'react-force-graph-2d';
 import { supabase } from '../supabase';
-import { Trash2, Menu, X } from 'lucide-react';
+import { Trash2, Menu, X, Sparkles } from 'lucide-react';
 
 const GraphView = ({ nodes, links, onRefresh, session }) => {
   const [selected, setSelected] = useState(null);
@@ -11,6 +11,8 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
     width: window.innerWidth,
     height: window.innerHeight
   });
+  const [hoveredNode, setHoveredNode] = useState(null);
+  const [sidebarPeople, setSidebarPeople] = useState([]);
   const graphRef = useRef();
   const imageCache = useRef({});
 
@@ -49,6 +51,11 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
         imageCache.current[imgSrc] = img;
       }
     });
+  }, [nodes]);
+
+  // Update sidebar people with stagger animation
+  useEffect(() => {
+    setSidebarPeople(nodes.map((n, i) => ({ ...n, staggerDelay: i * 50 })));
   }, [nodes]);
 
   // Configure Physics
@@ -191,13 +198,14 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
           )}
         </div>
 
-        {nodes.map(node => (
+        {sidebarPeople.map((node, index) => (
           <div
             key={node.id}
             onClick={() => {
               setSelected(node);
               if (isMobile) setIsSidebarOpen(false);
             }}
+            className="animate-slide-up-stagger"
             style={{
               cursor: 'pointer',
               padding: 12,
@@ -208,16 +216,36 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
               transition: 'all 0.2s',
               display: 'flex',
               alignItems: 'center',
-              gap: 10
+              gap: 10,
+              animationDelay: `${Math.min(index * 0.05, 0.5)}s`,
+              opacity: 0,
+              animationFillMode: 'forwards'
             }}
-            onMouseEnter={(e) => e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)'}
-            onMouseLeave={(e) => e.currentTarget.style.background = selected?.id === node.id ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255,255,255,0.05)'}
+            onMouseEnter={(e) => {
+              e.currentTarget.style.background = 'rgba(59, 130, 246, 0.2)';
+              e.currentTarget.style.transform = 'translateX(5px)';
+            }}
+            onMouseLeave={(e) => {
+              e.currentTarget.style.background = selected?.id === node.id ? 'rgba(59, 130, 246, 0.3)' : 'rgba(255,255,255,0.05)';
+              e.currentTarget.style.transform = 'translateX(0)';
+            }}
           >
-            <img
-              src={node.img || `https://api.dicebear.com/7.x/initials/svg?seed=${node.name}`}
-              style={{ width: 35, height: 35, borderRadius: '50%', objectFit: 'cover' }}
-              alt={node.name}
-            />
+            <div style={{ position: 'relative' }}>
+              <img
+                src={node.img || `https://api.dicebear.com/7.x/initials/svg?seed=${node.name}`}
+                style={{ width: 35, height: 35, borderRadius: '50%', objectFit: 'cover' }}
+                alt={node.name}
+              />
+              {hoveredNode?.id === node.id && (
+                <div style={{
+                  position: 'absolute',
+                  inset: -3,
+                  borderRadius: '50%',
+                  border: '2px solid #3B82F6',
+                  animation: 'pulse-glow 1s infinite'
+                }} />
+              )}
+            </div>
             <div style={{ flex: 1, minWidth: 0 }}>
               <div style={{
                 color: 'white',
@@ -296,7 +324,8 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
         flex: 1,
         position: 'relative',
         width: graphWidth,
-        height: graphHeight
+        height: graphHeight,
+        background: 'radial-gradient(circle at center, #0a0a1a 0%, #050505 100%)'
       }}>
         <ForceGraph2D
           ref={graphRef}
@@ -311,25 +340,38 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
 
               return {
                 ...node,
-                fx: layoutRadius * Math.cos(angle),
-                fy: layoutRadius * Math.sin(angle)
+                x: layoutRadius * Math.cos(angle),
+                y: layoutRadius * Math.sin(angle),
+                val: isMobile ? 10 : 14
               };
             }),
             links: links.map(link => ({ ...link }))
           }}
           nodeLabel="name"
           nodeAutoColorBy="id"
-          nodeRelSize={10}
+          nodeRelSize={isMobile ? 10 : 14}
+          nodeCanvasObjectMode={() => 'replace'}
           nodeCanvasObject={(node, ctx, globalScale) => {
-            const size = isMobile ? 10 : 12;
+            const size = isMobile ? 10 : 14;
             const isSelected = selected?.id === node.id;
+            const isHovered = hoveredNode?.id === node.id;
 
-            if (isSelected) {
-              ctx.shadowColor = '#60A5FA';
-              ctx.shadowBlur = 20;
+            // Add glow effect for selected or hovered nodes
+            if (isSelected || isHovered) {
+              ctx.shadowColor = isSelected ? '#60A5FA' : '#3B82F6';
+              ctx.shadowBlur = isSelected ? 25 : 15;
             } else {
               ctx.shadowColor = 'transparent';
               ctx.shadowBlur = 0;
+            }
+
+            // Draw outer ring for hovered nodes
+            if (isHovered && !isSelected) {
+              ctx.beginPath();
+              ctx.arc(node.x, node.y, size + 3, 0, 2 * Math.PI, false);
+              ctx.strokeStyle = 'rgba(59, 130, 246, 0.5)';
+              ctx.lineWidth = 2 / globalScale;
+              ctx.stroke();
             }
 
             ctx.beginPath();
@@ -352,8 +394,8 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
 
             ctx.beginPath();
             ctx.arc(node.x, node.y, size, 0, 2 * Math.PI, false);
-            ctx.lineWidth = isSelected ? 3 / globalScale : 1.5 / globalScale;
-            ctx.strokeStyle = isSelected ? '#60A5FA' : 'rgba(255,255,255,0.2)';
+            ctx.lineWidth = (isHovered ? 2.5 : isSelected ? 3 : 1.5) / globalScale;
+            ctx.strokeStyle = isSelected ? '#60A5FA' : (isHovered ? '#3B82F6' : 'rgba(255,255,255,0.2)');
             ctx.stroke();
 
             const label = node.name;
@@ -369,7 +411,7 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
             ctx.strokeStyle = 'rgba(0,0,0,0.8)';
             ctx.strokeText(label, node.x, node.y + size + fontSize);
 
-            ctx.fillStyle = isSelected ? '#60A5FA' : 'white';
+            ctx.fillStyle = (isSelected || isHovered) ? '#60A5FA' : 'white';
             ctx.fillText(label, node.x, node.y + size + fontSize);
 
             ctx.shadowBlur = 0;
@@ -400,36 +442,54 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
           }}
           backgroundColor="rgba(0,0,0,0)"
           cooldownTicks={100}
-          enableNodeDrag={false}
+          enableNodeDrag={true}
+          enableZoomInteraction={true}
+          enablePanInteraction={true}
           onNodeClick={(node) => {
+            console.log('Node clicked:', node.name);
             setSelected(node);
             if (isMobile) setIsSidebarOpen(false);
+          }}
+          onNodeHover={(node) => {
+            setHoveredNode(node);
+            // Change cursor to pointer when hovering over a node
+            const canvas = graphRef.current?.querySelector('canvas');
+            if (canvas) {
+              canvas.style.cursor = node ? 'pointer' : 'grab';
+            }
+          }}
+          onNodeRightClick={() => false}
+          onBackgroundClick={() => {
+            setSelected(null);
           }}
         />
       </div>
 
       {/* RIGHT SIDEBAR - PROFILE */}
       {selected && (
-        <div style={{
-          position: 'fixed',
-          bottom: isMobile ? 0 : 'auto',
-          top: isMobile ? 'auto' : 0,
-          right: 0,
-          left: isMobile ? 0 : 'auto',
-          width: isMobile ? '100%' : 350,
-          height: isMobile ? 'auto' : '100vh',
-          maxHeight: isMobile ? '85vh' : '100vh',
-          background: 'rgba(10, 10, 10, 0.98)',
-          backdropFilter: 'blur(20px)',
-          borderTop: isMobile ? '1px solid rgba(255,255,255,0.1)' : 'none',
-          borderLeft: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)',
-          padding: isMobile ? '20px 20px 30px' : 24,
-          zIndex: 50,
-          overflowY: 'auto',
-          borderRadius: isMobile ? '24px 24px 0 0' : 0,
-          boxShadow: isMobile ? '0 -4px 20px rgba(0,0,0,0.5)' : 'none',
-          transition: 'transform 0.3s ease-in-out'
-        }}>
+        <div
+          className="animate-fade-scale-in"
+          style={{
+            position: 'fixed',
+            bottom: isMobile ? 0 : 'auto',
+            top: isMobile ? 'auto' : 0,
+            right: 0,
+            left: isMobile ? 0 : 'auto',
+            width: isMobile ? '100%' : 350,
+            height: isMobile ? 'auto' : '100vh',
+            maxHeight: isMobile ? '85vh' : '100vh',
+            background: 'rgba(10, 10, 10, 0.98)',
+            backdropFilter: 'blur(20px)',
+            borderTop: isMobile ? '1px solid rgba(255,255,255,0.1)' : 'none',
+            borderLeft: isMobile ? 'none' : '1px solid rgba(255,255,255,0.1)',
+            padding: isMobile ? '20px 20px 30px' : 24,
+            zIndex: 50,
+            overflowY: 'auto',
+            borderRadius: isMobile ? '24px 24px 0 0' : 0,
+            boxShadow: isMobile ? '0 -4px 20px rgba(0,0,0,0.5)' : 'none',
+            transition: 'transform 0.3s ease-in-out'
+          }}
+        >
           <div style={{
             display: 'flex',
             justifyContent: 'flex-end',
@@ -479,16 +539,29 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
           <div style={{ textAlign: 'center' }}>
             <div style={{ position: 'relative', display: 'inline-block', marginBottom: 15 }}>
               {selected.emoji && (
-                <span style={{
-                  position: 'absolute',
-                  top: -8,
-                  right: -8,
-                  fontSize: isMobile ? 28 : 35,
-                  zIndex: 1
-                }}>
+                <span
+                  className="animate-float"
+                  style={{
+                    position: 'absolute',
+                    top: -8,
+                    right: -8,
+                    fontSize: isMobile ? 28 : 35,
+                    zIndex: 1
+                  }}
+                >
                   {selected.emoji}
                 </span>
               )}
+              <div
+                style={{
+                  position: 'absolute',
+                  inset: -10,
+                  borderRadius: '50%',
+                  background: 'radial-gradient(circle, rgba(59, 130, 246, 0.3) 0%, transparent 70%)',
+                  animation: 'pulse-glow 2s infinite',
+                  zIndex: 0
+                }}
+              />
               <img
                 src={selected.img || `https://api.dicebear.com/7.x/initials/svg?seed=${selected.name}`}
                 style={{
@@ -497,9 +570,14 @@ const GraphView = ({ nodes, links, onRefresh, session }) => {
                   borderRadius: '50%',
                   border: '4px solid #3B82F6',
                   boxShadow: '0 0 30px rgba(59, 130, 246, 0.5)',
-                  objectFit: 'cover'
+                  objectFit: 'cover',
+                  position: 'relative',
+                  zIndex: 1,
+                  transition: 'transform 0.3s ease'
                 }}
                 alt={selected.name}
+                onMouseEnter={(e) => e.currentTarget.style.transform = 'scale(1.05)'}
+                onMouseLeave={(e) => e.currentTarget.style.transform = 'scale(1)'}
               />
             </div>
 

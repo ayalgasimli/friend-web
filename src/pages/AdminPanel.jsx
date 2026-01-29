@@ -23,7 +23,7 @@ const Toast = ({ message, type, onClose }) => {
   );
 };
 
-// Image Dropzone Component
+// Image Dropzone Component with enhanced effects
 const ImageDropzone = ({ value, onChange, previewName }) => {
   const [isDragging, setIsDragging] = useState(false);
   const [isLoading, setIsLoading] = useState(false);
@@ -72,8 +72,8 @@ const ImageDropzone = ({ value, onChange, previewName }) => {
         onDrop={handleDrop}
         onDragOver={handleDragOver}
         onDragLeave={handleDragLeave}
-        className={`relative flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer transition-all ${isDragging
-          ? 'border-blue-500 bg-blue-500/10'
+        className={`relative flex flex-col items-center justify-center p-4 border-2 border-dashed rounded-xl cursor-pointer transition-all overflow-hidden ${isDragging
+          ? 'border-blue-500 bg-blue-500/10 animate-pulse-glow'
           : 'border-white/10 hover:border-white/30 bg-black/20'
           }`}
       >
@@ -99,7 +99,7 @@ const ImageDropzone = ({ value, onChange, previewName }) => {
           </div>
         ) : (
           <>
-            <Upload className="w-8 h-8 text-gray-500 mb-2" />
+            <Upload className="w-8 h-8 text-gray-500 mb-2 animate-bounce-slow" />
             <p className="text-sm text-gray-400">Drop image here or click to upload</p>
             <p className="text-xs text-gray-600">PNG, JPG, GIF up to 2MB</p>
           </>
@@ -113,12 +113,79 @@ const ImageDropzone = ({ value, onChange, previewName }) => {
         <div className="flex-1 h-px bg-white/10"></div>
       </div>
       <input
-        className="w-full bg-black/40 border border-white/10 p-3 rounded-lg focus:outline-none focus:border-blue-500 transition text-white text-sm"
+        className="w-full bg-black/40 border border-white/10 p-3 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition text-white text-sm"
         placeholder="https://example.com/photo.jpg"
         value={value?.startsWith('data:') ? '' : value}
         onChange={e => onChange(e.target.value)}
       />
     </div>
+  );
+};
+
+// Floating Label Input Component
+const FloatingLabelInput = ({ label, value, onChange, type = 'text', icon: Icon, iconColor, className = '', ...props }) => {
+  const [isFocused, setIsFocused] = useState(false);
+
+  return (
+    <div className={`relative ${className}`}>
+      {Icon && (
+        <Icon
+          size={16}
+          className={`absolute left-3 top-1/2 -translate-y-1/2 transition-colors ${isFocused ? 'text-blue-400' : iconColor || 'text-gray-500'}`}
+        />
+      )}
+      <input
+        type={type}
+        value={value}
+        onChange={onChange}
+        onFocus={() => setIsFocused(true)}
+        onBlur={() => setIsFocused(false)}
+        className={`w-full bg-black/40 border ${isFocused ? 'border-blue-500 ring-2 ring-blue-500/20' : 'border-white/10'} p-3 ${Icon ? 'pl-10' : ''} rounded-lg focus:outline-none transition text-white`}
+        placeholder={label}
+        {...props}
+      />
+    </div>
+  );
+};
+
+// Ripple Button Component
+const RippleButton = ({ children, onClick, className = '', variant = 'primary', ...props }) => {
+  const [ripples, setRipples] = useState([]);
+
+  const handleClick = (e) => {
+    const button = e.currentTarget;
+    const rect = button.getBoundingClientRect();
+    const x = e.clientX - rect.left;
+    const y = e.clientY - rect.top;
+
+    const newRipple = { x, y, id: Date.now() };
+    setRipples([...ripples, newRipple]);
+
+    setTimeout(() => {
+      setRipples(ripples.filter(r => r.id !== newRipple.id));
+    }, 600);
+
+    if (onClick) onClick(e);
+  };
+
+  return (
+    <button
+      onClick={handleClick}
+      className={`relative overflow-hidden ${variant === 'primary' ? 'bg-blue-600 hover:bg-blue-500 shadow-lg shadow-blue-900/20' : variant === 'danger' ? 'bg-red-600 hover:bg-red-500 shadow-lg shadow-red-900/20' : 'bg-white/5 hover:bg-white/10'} text-white font-bold p-3 rounded-lg transition transform hover:scale-105 active:scale-95 ${className}`}
+      {...props}
+    >
+      {children}
+      {ripples.map(ripple => (
+        <span
+          key={ripple.id}
+          className="ripple"
+          style={{
+            left: ripple.x,
+            top: ripple.y
+          }}
+        />
+      ))}
+    </button>
   );
 };
 
@@ -151,54 +218,87 @@ const EditModal = ({ person, onClose, onSave }) => {
   };
 
   return (
-    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto">
-      <div className="bg-slate-900 border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl my-8">
+    <div className="fixed inset-0 bg-black/60 backdrop-blur-sm z-50 flex items-center justify-center p-4 overflow-y-auto animate-fade-scale-in">
+      <div className="bg-slate-900/95 backdrop-blur-xl border border-white/10 rounded-2xl p-6 w-full max-w-lg shadow-2xl my-8">
         <div className="flex items-center justify-between mb-6">
-          <h3 className="text-xl font-bold text-white">Edit Profile</h3>
-          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition">
+          <h3 className="text-xl font-bold bg-gradient-to-r from-blue-400 to-purple-500 bg-clip-text text-transparent">Edit Profile</h3>
+          <button onClick={onClose} className="p-2 hover:bg-white/10 rounded-full transition transform hover:rotate-90">
             <X size={20} className="text-gray-400" />
           </button>
         </div>
         <form onSubmit={handleSubmit} className="flex flex-col gap-4 max-h-[70vh] overflow-y-auto pr-2 custom-scrollbar">
           {/* Basic Info */}
           <div className="flex gap-3">
-            <input className="flex-1 bg-black/40 border border-white/10 p-3 rounded-lg focus:outline-none focus:border-blue-500 transition text-white" placeholder="Name *" value={name} onChange={e => setName(e.target.value)} required />
-            <input className="w-20 bg-black/40 border border-white/10 p-3 rounded-lg focus:outline-none focus:border-blue-500 transition text-white text-center text-2xl" placeholder="😎" value={emoji} onChange={e => setEmoji(e.target.value)} maxLength={2} />
+            <FloatingLabelInput
+              className="flex-1"
+              placeholder="Name *"
+              value={name}
+              onChange={e => setName(e.target.value)}
+              required
+            />
+            <input
+              className="w-20 bg-black/40 border border-white/10 p-3 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition text-white text-center text-2xl"
+              placeholder="😎"
+              value={emoji}
+              onChange={e => setEmoji(e.target.value)}
+              maxLength={2}
+            />
           </div>
-          <input className="w-full bg-black/40 border border-white/10 p-3 rounded-lg focus:outline-none focus:border-blue-500 transition text-white" placeholder="Vibe Tag" value={vibe} onChange={e => setVibe(e.target.value)} />
+          <FloatingLabelInput
+            placeholder="Vibe Tag"
+            value={vibe}
+            onChange={e => setVibe(e.target.value)}
+          />
 
           {/* Bio */}
-          <textarea className="w-full bg-black/40 border border-white/10 p-3 rounded-lg focus:outline-none focus:border-blue-500 transition text-white h-20 resize-none" placeholder="Bio" value={bio} onChange={e => setBio(e.target.value)} />
+          <textarea
+            className="w-full bg-black/40 border border-white/10 p-3 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition text-white h-20 resize-none"
+            placeholder="Bio"
+            value={bio}
+            onChange={e => setBio(e.target.value)}
+          />
 
           {/* Details */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="relative">
-              <Cake size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-              <input type="date" className="w-full bg-black/40 border border-white/10 p-3 pl-10 rounded-lg focus:outline-none focus:border-blue-500 transition text-white" value={birthday} onChange={e => setBirthday(e.target.value)} />
-            </div>
-            <div className="relative">
-              <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-              <input className="w-full bg-black/40 border border-white/10 p-3 pl-10 rounded-lg focus:outline-none focus:border-blue-500 transition text-white" placeholder="Location" value={location} onChange={e => setLocation(e.target.value)} />
-            </div>
+            <FloatingLabelInput
+              type="date"
+              icon={Cake}
+              iconColor="text-gray-500"
+              value={birthday}
+              onChange={e => setBirthday(e.target.value)}
+            />
+            <FloatingLabelInput
+              icon={MapPin}
+              iconColor="text-gray-500"
+              placeholder="Location"
+              value={location}
+              onChange={e => setLocation(e.target.value)}
+            />
           </div>
 
           {/* Socials */}
           <div className="grid grid-cols-2 gap-3">
-            <div className="relative">
-              <Instagram size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-pink-500" />
-              <input className="w-full bg-black/40 border border-white/10 p-3 pl-10 rounded-lg focus:outline-none focus:border-blue-500 transition text-white" placeholder="Instagram" value={instagram} onChange={e => setInstagram(e.target.value)} />
-            </div>
-            <div className="relative">
-              <Twitter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
-              <input className="w-full bg-black/40 border border-white/10 p-3 pl-10 rounded-lg focus:outline-none focus:border-blue-500 transition text-white" placeholder="Twitter/X" value={twitter} onChange={e => setTwitter(e.target.value)} />
-            </div>
+            <FloatingLabelInput
+              icon={Instagram}
+              iconColor="text-pink-500"
+              placeholder="Instagram"
+              value={instagram}
+              onChange={e => setInstagram(e.target.value)}
+            />
+            <FloatingLabelInput
+              icon={Twitter}
+              iconColor="text-blue-400"
+              placeholder="Twitter/X"
+              value={twitter}
+              onChange={e => setTwitter(e.target.value)}
+            />
           </div>
 
           <ImageDropzone value={img} onChange={setImg} previewName={name} />
 
           <div className="flex gap-3 mt-2">
-            <button type="button" onClick={onClose} className="flex-1 bg-white/5 hover:bg-white/10 text-white font-bold p-3 rounded-lg transition">Cancel</button>
-            <button type="submit" className="flex-1 bg-blue-600 hover:bg-blue-500 text-white font-bold p-3 rounded-lg transition">Save Changes</button>
+            <RippleButton type="button" onClick={onClose} variant="secondary">Cancel</RippleButton>
+            <RippleButton type="submit" variant="primary">Save Changes</RippleButton>
           </div>
         </form>
       </div>
@@ -417,64 +517,104 @@ const AdminPanel = ({ nodes, links = [], refreshData }) => {
             <form onSubmit={handleAddPerson} className="flex flex-col gap-4">
               {/* Basic Info */}
               <div className="flex gap-3">
-                <input className="flex-1 bg-black/40 border border-white/10 p-3 rounded-lg focus:outline-none focus:border-blue-500 transition text-white" placeholder="Name *" value={newName} onChange={e => setNewName(e.target.value)} required />
-                <input className="w-20 bg-black/40 border border-white/10 p-3 rounded-lg focus:outline-none focus:border-blue-500 transition text-white text-center text-2xl" placeholder="😎" value={newEmoji} onChange={e => setNewEmoji(e.target.value)} maxLength={2} title="Pick an emoji" />
+                <FloatingLabelInput
+                  className="flex-1"
+                  placeholder="Name *"
+                  value={newName}
+                  onChange={e => setNewName(e.target.value)}
+                  required
+                />
+                <input
+                  className="w-20 bg-black/40 border border-white/10 p-3 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition text-white text-center text-2xl"
+                  placeholder="😎"
+                  value={newEmoji}
+                  onChange={e => setNewEmoji(e.target.value)}
+                  maxLength={2}
+                  title="Pick an emoji"
+                />
               </div>
-              <input className="w-full bg-black/40 border border-white/10 p-3 rounded-lg focus:outline-none focus:border-blue-500 transition text-white" placeholder="Vibe Tag (e.g. The Architect, Chaos Energy)" value={newVibe} onChange={e => setNewVibe(e.target.value)} />
+              <FloatingLabelInput
+                placeholder="Vibe Tag (e.g. The Architect, Chaos Energy)"
+                value={newVibe}
+                onChange={e => setNewVibe(e.target.value)}
+              />
 
               {/* Bio */}
-              <textarea className="w-full bg-black/40 border border-white/10 p-3 rounded-lg focus:outline-none focus:border-blue-500 transition text-white h-20 resize-none" placeholder="Bio - Who are they? What's their story?" value={newBio} onChange={e => setNewBio(e.target.value)} />
+              <textarea
+                className="w-full bg-black/40 border border-white/10 p-3 rounded-lg focus:outline-none focus:border-blue-500 focus:ring-2 focus:ring-blue-500/20 transition text-white h-20 resize-none"
+                placeholder="Bio - Who are they? What's their story?"
+                value={newBio}
+                onChange={e => setNewBio(e.target.value)}
+              />
 
               {/* Details Row */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="relative">
-                  <Cake size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                  <input type="date" className="w-full bg-black/40 border border-white/10 p-3 pl-10 rounded-lg focus:outline-none focus:border-blue-500 transition text-white" value={newBirthday} onChange={e => setNewBirthday(e.target.value)} />
-                </div>
-                <div className="relative">
-                  <MapPin size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-gray-500" />
-                  <input className="w-full bg-black/40 border border-white/10 p-3 pl-10 rounded-lg focus:outline-none focus:border-blue-500 transition text-white" placeholder="Location" value={newLocation} onChange={e => setNewLocation(e.target.value)} />
-                </div>
+                <FloatingLabelInput
+                  type="date"
+                  icon={Cake}
+                  iconColor="text-gray-500"
+                  value={newBirthday}
+                  onChange={e => setNewBirthday(e.target.value)}
+                />
+                <FloatingLabelInput
+                  icon={MapPin}
+                  iconColor="text-gray-500"
+                  placeholder="Location"
+                  value={newLocation}
+                  onChange={e => setNewLocation(e.target.value)}
+                />
               </div>
 
               {/* Socials */}
               <div className="grid grid-cols-2 gap-3">
-                <div className="relative">
-                  <Instagram size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-pink-500" />
-                  <input className="w-full bg-black/40 border border-white/10 p-3 pl-10 rounded-lg focus:outline-none focus:border-blue-500 transition text-white" placeholder="Instagram handle" value={newInstagram} onChange={e => setNewInstagram(e.target.value)} />
-                </div>
-                <div className="relative">
-                  <Twitter size={16} className="absolute left-3 top-1/2 -translate-y-1/2 text-blue-400" />
-                  <input className="w-full bg-black/40 border border-white/10 p-3 pl-10 rounded-lg focus:outline-none focus:border-blue-500 transition text-white" placeholder="Twitter/X handle" value={newTwitter} onChange={e => setNewTwitter(e.target.value)} />
-                </div>
+                <FloatingLabelInput
+                  icon={Instagram}
+                  iconColor="text-pink-500"
+                  placeholder="Instagram handle"
+                  value={newInstagram}
+                  onChange={e => setNewInstagram(e.target.value)}
+                />
+                <FloatingLabelInput
+                  icon={Twitter}
+                  iconColor="text-blue-400"
+                  placeholder="Twitter/X handle"
+                  value={newTwitter}
+                  onChange={e => setNewTwitter(e.target.value)}
+                />
               </div>
 
               {/* Image */}
               <ImageDropzone value={newImg} onChange={setNewImg} previewName={newName} />
 
-              <button className="bg-blue-600 hover:bg-blue-500 text-white font-bold p-3 rounded-lg transition shadow-lg shadow-blue-900/20 mt-2">Add to Universe</button>
+              <RippleButton type="submit" variant="primary" className="mt-2">
+                Add to Universe
+              </RippleButton>
             </form>
 
 
             <div className="mt-8 pt-6 border-t border-white/10">
               <h3 className="font-bold text-xs text-gray-500 mb-3 uppercase tracking-widest">Population ({nodes.length})</h3>
               <div className="grid gap-2 max-h-64 overflow-y-auto pr-2 custom-scrollbar">
-                {[...nodes].sort((a, b) => a.name.localeCompare(b.name)).map(n => (
-                  <div key={n.id} className="flex items-center justify-between bg-white/5 px-4 py-3 rounded-xl border border-white/5 hover:bg-white/10 transition group">
+                {[...nodes].sort((a, b) => a.name.localeCompare(b.name)).map((n, index) => (
+                  <div
+                    key={n.id}
+                    className="animate-slide-up-stagger flex items-center justify-between bg-white/5 px-4 py-3 rounded-xl border border-white/5 hover:bg-white/10 hover:shadow-lg hover:shadow-blue-500/10 transition group"
+                    style={{ animationDelay: `${Math.min(index * 0.05, 0.5)}s`, opacity: 0, animationFillMode: 'forwards' }}
+                  >
                     <div className="flex items-center gap-3">
-                      {n.img && <img src={n.img} className="w-8 h-8 rounded-full" />}
+                      {n.img && <img src={n.img} className="w-8 h-8 rounded-full ring-2 ring-transparent group-hover:ring-blue-500/30 transition" />}
                       <div>
                         <span className="text-sm text-white font-medium">{n.name}</span>
                         {n.vibe && <span className="text-xs text-gray-500 ml-2">{n.vibe}</span>}
                       </div>
                     </div>
                     <div className="flex gap-1 opacity-0 group-hover:opacity-100 transition">
-                      <button onClick={() => setEditingPerson(n)} className="p-2 hover:bg-white/10 rounded-lg transition" title="Edit">
+                      <button onClick={() => setEditingPerson(n)} className="p-2 hover:bg-white/10 rounded-lg transition hover:scale-110" title="Edit">
                         <Pencil size={14} className="text-blue-400" />
                       </button>
                       <button
                         onClick={() => handleDeletePerson(n)}
-                        className={`p-2 rounded-lg transition flex items-center gap-1 ${deletePersonId === n.id ? 'bg-red-500 text-white opacity-100' : 'hover:bg-red-500/20 opacity-0 group-hover:opacity-100'}`}
+                        className={`p-2 rounded-lg transition flex items-center gap-1 hover:scale-110 ${deletePersonId === n.id ? 'bg-red-500 text-white opacity-100' : 'hover:bg-red-500/20 opacity-0 group-hover:opacity-100'}`}
                       >
                         <Trash2 size={14} className={deletePersonId === n.id ? 'text-white' : 'text-red-400'} />
                         {deletePersonId === n.id && <span className="text-xs font-bold">Sure?</span>}
@@ -541,16 +681,20 @@ const AdminPanel = ({ nodes, links = [], refreshData }) => {
                       const sB = nodes.find(n => n.id === (b.source.id || b.source))?.name || '';
                       return sA.localeCompare(sB);
                     })
-                    .map(rel => {
+                    .map((rel, index) => {
                       const sourceId = rel.source?.id || rel.source;
                       const targetId = rel.target?.id || rel.target;
 
                       const source = nodes.find(n => n.id === sourceId);
                       const target = nodes.find(n => n.id === targetId);
                       return (
-                        <div key={rel.id} className="flex items-center justify-between bg-white/5 px-4 py-3 rounded-xl border border-white/5 hover:bg-white/10 transition group">
+                        <div
+                          key={rel.id}
+                          className="animate-slide-up-stagger flex items-center justify-between bg-white/5 px-4 py-3 rounded-xl border border-white/5 hover:bg-white/10 hover:shadow-lg hover:shadow-red-500/10 transition group"
+                          style={{ animationDelay: `${Math.min(index * 0.05, 0.5)}s`, opacity: 0, animationFillMode: 'forwards' }}
+                        >
                           <div className="flex items-center gap-3">
-                            <span className={`w-2 h-2 rounded-full ${getRelColor(rel.type)}`}></span>
+                            <span className={`w-2 h-2 rounded-full ${getRelColor(rel.type)} animate-pulse-slow`}></span>
                             <span className="text-sm text-white">{source?.name || '?'}</span>
                             <span className="text-gray-500">↔</span>
                             <span className="text-sm text-white">{target?.name || '?'}</span>
@@ -558,7 +702,7 @@ const AdminPanel = ({ nodes, links = [], refreshData }) => {
                           </div>
                           <button
                             onClick={() => handleDeleteRelationship(rel)}
-                            className={`p-2 rounded-lg transition flex items-center gap-1 ${deleteBondId === rel.id ? 'bg-red-500 text-white opacity-100' : 'hover:bg-red-500/20 opacity-0 group-hover:opacity-100'}`}
+                            className={`p-2 rounded-lg transition flex items-center gap-1 hover:scale-110 ${deleteBondId === rel.id ? 'bg-red-500 text-white opacity-100' : 'hover:bg-red-500/20 opacity-0 group-hover:opacity-100'}`}
                           >
                             <Trash2 size={14} className={deleteBondId === rel.id ? 'text-white' : 'text-red-400'} />
                             {deleteBondId === rel.id && <span className="text-xs font-bold">Sure?</span>}
